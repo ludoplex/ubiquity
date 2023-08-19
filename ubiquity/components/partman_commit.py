@@ -52,7 +52,7 @@ class PartmanCommit(FilteredCommand):
             return True
 
         elif question == 'partman/exception_handler':
-            if priority == 'critical' or priority == 'high':
+            if priority in ['critical', 'high']:
                 response = self.frontend.question_dialog(
                     self.description(question),
                     self.extended_description(question),
@@ -63,23 +63,19 @@ class PartmanCommit(FilteredCommand):
             return True
 
         elif question == 'partman/exception_handler_note':
-            if priority == 'critical' or priority == 'high':
-                self.frontend.error_dialog(self.description(question),
-                                           self.extended_description(question))
-                return FilteredCommand.error(self, priority, question)
-            else:
+            if priority not in ['critical', 'high']:
                 return True
 
+            self.frontend.error_dialog(self.description(question),
+                                       self.extended_description(question))
+            return FilteredCommand.error(self, priority, question)
         elif self.question_type(question) == 'boolean':
             response = self.frontend.question_dialog(
                 self.description(question),
                 self.extended_description(question),
                 ('ubiquity/text/go_back', 'ubiquity/text/continue'))
 
-            answer_reversed = False
-            if (question == 'partman-jfs/jfs_boot' or
-                    question == 'partman-jfs/jfs_root'):
-                answer_reversed = True
+            answer_reversed = question in ['partman-jfs/jfs_boot', 'partman-jfs/jfs_root']
             if response == 'ubiquity/text/continue':
                 answer = answer_reversed
             else:

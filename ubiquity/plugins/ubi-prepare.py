@@ -362,7 +362,7 @@ class PageKde(PreparePageBase):
             except Exception as e:
                 print('unable to set up network connection watch:', e)
         except Exception as e:
-            print("Could not create prepare page:", str(e), file=sys.stderr)
+            print("Could not create prepare page:", e, file=sys.stderr)
             self.debug('Could not create prepare page: %s', e)
             self.page = None
         self.set_using_secureboot(False)
@@ -435,9 +435,7 @@ class PageKde(PreparePageBase):
         self.prepare_minimal_install.setChecked(val)
 
     def get_minimal_install(self):
-        if self.prepare_minimal_install.isChecked():
-            return True
-        return False
+        return bool(self.prepare_minimal_install.isChecked())
 
     def set_allow_nonfree(self, allow):
         if not allow:

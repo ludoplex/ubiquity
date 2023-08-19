@@ -80,8 +80,7 @@ LOCALEDIR = "/usr/share/locale"
 def set_root_cursor(cursor=None):
     if cursor is None:
         cursor = Gdk.Cursor.new(Gdk.CursorType.ARROW)
-    win = Gdk.get_default_root_window()
-    if win:
+    if win := Gdk.get_default_root_window():
         win.set_cursor(cursor)
     gtkwidgets.refresh()
 
@@ -179,13 +178,13 @@ class Wizard(BaseFrontend):
             """Inserts a subpage into the notebook.  This assumes the file
             shares the same base name as the page you are looking for."""
             widget = None
-            uifile = UIDIR + '/' + name + '.ui'
+            uifile = f'{UIDIR}/{name}.ui'
             if os.path.exists(uifile):
                 self.builder.add_from_file(uifile)
                 widget = self.builder.get_object(name)
                 steps.append_page(widget, None)
             else:
-                print('Could not find ui file %s' % name, file=sys.stderr)
+                print(f'Could not find ui file {name}', file=sys.stderr)
             return widget
 
         def add_widget(self, widget):
@@ -318,7 +317,7 @@ class Wizard(BaseFrontend):
             provider, Gtk.STYLE_PROVIDER_PRIORITY_USER)
 
         # load the main interface
-        self.builder.add_from_file('%s/ubiquity.ui' % UIDIR)
+        self.builder.add_from_file(f'{UIDIR}/ubiquity.ui')
 
         self.builders = [self.builder]
         self.pages = []
@@ -478,11 +477,7 @@ class Wizard(BaseFrontend):
     def translate_pages(self, lang=None, just_current=True, not_current=False,
                         reget=False):
         current_page = self.pages[self.pagesindex]
-        if just_current:
-            pages = [current_page]
-        else:
-            pages = self.pages
-
+        pages = [current_page] if just_current else self.pages
         if reget:
             self.translate_reget(lang)
 
@@ -493,13 +488,11 @@ class Wizard(BaseFrontend):
                 continue
             prefix = p.ui.get('plugin_prefix')
             for w in p.all_widgets:
-                for c in self.all_children(w):
-                    widgets.append((c, prefix))
+                widgets.extend((c, prefix) for c in self.all_children(w))
         if not just_current:
             for toplevel in self.toplevels:
                 if toplevel.get_name() != 'live_installer':
-                    for c in self.all_children(toplevel):
-                        widgets.append((c, None))
+                    widgets.extend((c, None) for c in self.all_children(toplevel))
         self.translate_widgets(lang=lang, widgets=widgets, reget=False)
         self.set_page_title(current_page, lang)
 
@@ -512,8 +505,7 @@ class Wizard(BaseFrontend):
                 try:
                     p.ui.plugin_translate(lang or self.locale)
                 except Exception as e:
-                    print('Could not translate page (%s): %s' %
-                          (p.module.NAME, str(e)), file=sys.stderr)
+                    print(f'Could not translate page ({p.module.NAME}): {str(e)}', file=sys.stderr)
 
     def excepthook(self, exctype, excvalue, exctb):
         """Crash handler."""
@@ -557,7 +549,6 @@ class Wizard(BaseFrontend):
                     # with non-matching real/effective u/gid
                     misc.drop_all_privileges()
                     misc.execute('/usr/share/apport/apport-gtk')
-            sys.exit(1)
         else:
             self.crash_detail_label.set_text(tbtext)
             self.crash_dialog.run()
@@ -565,7 +556,8 @@ class Wizard(BaseFrontend):
             self.live_installer.hide()
             self.refresh()
             misc.execute_root("apport-bug", "ubiquity")
-            sys.exit(1)
+
+        sys.exit(1)
 
     def network_change(self, online=False):
         if not online:
@@ -588,12 +580,11 @@ class Wizard(BaseFrontend):
     def thunar_set_volmanrc(self, fields):
         previous = {}
         if 'SUDO_USER' in os.environ:
-            thunar_dir = os.path.expanduser('~%s/.config/Thunar' %
-                                            os.environ['SUDO_USER'])
+            thunar_dir = os.path.expanduser(f"~{os.environ['SUDO_USER']}/.config/Thunar")
         else:
             thunar_dir = os.path.expanduser('~/.config/Thunar')
         if os.path.isdir(thunar_dir):
-            thunar_volmanrc = '%s/volmanrc' % thunar_dir
+            thunar_volmanrc = f'{thunar_dir}/volmanrc'
             parser = configparser.RawConfigParser()
             parser.optionxform = str  # case-sensitive
             parser.read(thunar_volmanrc)
@@ -606,10 +597,9 @@ class Wizard(BaseFrontend):
                     previous[key] = 'TRUE'
                 parser.set('Configuration', key, value)
             try:
-                with open('%s.new' % thunar_volmanrc,
-                          'w') as thunar_volmanrc_new:
+                with open(f'{thunar_volmanrc}.new', 'w') as thunar_volmanrc_new:
                     parser.write(thunar_volmanrc_new)
-                os.rename('%s.new' % thunar_volmanrc, thunar_volmanrc)
+                os.rename(f'{thunar_volmanrc}.new', thunar_volmanrc)
             except (KeyboardInterrupt, SystemExit):
                 raise
             except Exception:
@@ -619,7 +609,7 @@ class Wizard(BaseFrontend):
     def disable_terminal(self):
         gs_schema = 'org.gnome.settings-daemon.plugins.media-keys'
         gs_key = 'terminal'
-        gs_previous = '%s/%s' % (gs_schema, gs_key)
+        gs_previous = f'{gs_schema}/{gs_key}'
         if gs_previous in self.gsettings_previous:
             return
 
@@ -634,7 +624,7 @@ class Wizard(BaseFrontend):
     def enable_terminal(self):
         gs_schema = 'org.gnome.settings-daemon.plugins.media-keys'
         gs_key = 'terminal'
-        gs_previous = '%s/%s' % (gs_schema, gs_key)
+        gs_previous = f'{gs_schema}/{gs_key}'
         gs_value = self.gsettings_previous[gs_previous]
 
         gsettings.set(gs_schema, gs_key, gs_value)
@@ -642,7 +632,7 @@ class Wizard(BaseFrontend):
     def disable_screensaver(self):
         gs_schema = 'org.gnome.desktop.screensaver'
         gs_key = 'idle-activation-enabled'
-        gs_previous = '%s/%s' % (gs_schema, gs_key)
+        gs_previous = f'{gs_schema}/{gs_key}'
         if gs_previous in self.gsettings_previous:
             return
 
@@ -657,7 +647,7 @@ class Wizard(BaseFrontend):
     def enable_screensaver(self):
         gs_schema = 'org.gnome.desktop.screensaver'
         gs_key = 'idle-activation-enabled'
-        gs_previous = '%s/%s' % (gs_schema, gs_key)
+        gs_previous = f'{gs_schema}/{gs_key}'
         gs_value = self.gsettings_previous[gs_previous]
 
         gsettings.set(gs_schema, gs_key, gs_value)
@@ -665,7 +655,7 @@ class Wizard(BaseFrontend):
     def disable_screen_blanking(self):
         gs_schema = 'org.gnome.desktop.session'
         gs_key = 'idle-delay'
-        gs_previous = '%s/%s' % (gs_schema, gs_key)
+        gs_previous = f'{gs_schema}/{gs_key}'
         if gs_previous in self.gsettings_previous:
             return
 
@@ -680,7 +670,7 @@ class Wizard(BaseFrontend):
     def enable_screen_blanking(self):
         gs_schema = 'org.gnome.desktop.session'
         gs_key = 'idle-delay'
-        gs_previous = '%s/%s' % (gs_schema, gs_key)
+        gs_previous = f'{gs_schema}/{gs_key}'
         gs_value = self.gsettings_previous[gs_previous]
 
         gsettings.set(gs_schema, gs_key, gs_value)
@@ -688,7 +678,7 @@ class Wizard(BaseFrontend):
     def disable_powermgr(self):
         gs_schema = 'org.gnome.settings-daemon.plugins.power'
         gs_key = 'active'
-        gs_previous = '%s/%s' % (gs_schema, gs_key)
+        gs_previous = f'{gs_schema}/{gs_key}'
         if gs_previous in self.gsettings_previous:
             return
 
@@ -703,7 +693,7 @@ class Wizard(BaseFrontend):
     def enable_powermgr(self):
         gs_schema = 'org.gnome.settings-daemon.plugins.power'
         gs_key = 'active'
-        gs_previous = '%s/%s' % (gs_schema, gs_key)
+        gs_previous = f'{gs_schema}/{gs_key}'
         gs_value = self.gsettings_previous[gs_previous]
 
         gsettings.set(gs_schema, gs_key, gs_value)
@@ -711,7 +701,7 @@ class Wizard(BaseFrontend):
     def disable_logout_indicator(self):
         gs_schema = 'com.canonical.indicator.session'
         gs_key = 'suppress-logout-menuitem'
-        gs_previous = '%s/%s' % (gs_schema, gs_key)
+        gs_previous = f'{gs_schema}/{gs_key}'
         if gs_previous in self.gsettings_previous:
             return
 
@@ -726,7 +716,7 @@ class Wizard(BaseFrontend):
     def enable_logout_indicator(self):
         gs_schema = 'com.canonical.indicator.session'
         gs_key = 'suppress-logout-menuitem'
-        gs_previous = '%s/%s' % (gs_schema, gs_key)
+        gs_previous = f'{gs_schema}/{gs_key}'
         gs_value = self.gsettings_previous[gs_previous]
 
         gsettings.set(gs_schema, gs_key, gs_value)
@@ -747,7 +737,7 @@ class Wizard(BaseFrontend):
             gs_schema = keys[0]
             gs_key = keys[1]
             gs_wantedvalue = keys[2]
-            gs_previous = '%s/%s' % (gs_schema, gs_key)
+            gs_previous = f'{gs_schema}/{gs_key}'
             if gs_previous in self.gsettings_previous:
                 continue
 
@@ -773,7 +763,7 @@ class Wizard(BaseFrontend):
                      media_autorun_never):
             gs_schema = keys[0]
             gs_key = keys[1]
-            gs_previous = '%s/%s' % (gs_schema, gs_key)
+            gs_previous = f'{gs_schema}/{gs_key}'
             gs_value = self.gsettings_previous[gs_previous]
 
             gsettings.set(gs_schema, gs_key, gs_value)
@@ -782,34 +772,35 @@ class Wizard(BaseFrontend):
             self.thunar_set_volmanrc(self.thunar_previous)
 
     def a11y_profile_keys(self, window, event):
-        if osextras.find_on_path('a11y-profile-manager'):
-            hc_profile_found = False
-            sr_profile_found = False
+        if not osextras.find_on_path('a11y-profile-manager'):
+            return
+        hc_profile_found = False
+        sr_profile_found = False
 
-            subp = subprocess.Popen(['a11y-profile-manager',
-                                    '-l'],
-                                    stdout=subprocess.PIPE,
-                                    preexec_fn=misc.drop_all_privileges,
-                                    universal_newlines=True)
+        subp = subprocess.Popen(['a11y-profile-manager',
+                                '-l'],
+                                stdout=subprocess.PIPE,
+                                preexec_fn=misc.drop_all_privileges,
+                                universal_newlines=True)
 
-            for line in subp.stdout:
-                value = line.rstrip('\n')
-                if value.endswith('high-contrast'):
-                    hc_profile_found = True
-                    self.hc_profile_name = value
-                if value.endswith('blindness'):
-                    sr_profile_found = True
-                    self.sr_profile_name = value
+        for line in subp.stdout:
+            value = line.rstrip('\n')
+            if value.endswith('high-contrast'):
+                hc_profile_found = True
+                self.hc_profile_name = value
+            if value.endswith('blindness'):
+                sr_profile_found = True
+                self.sr_profile_name = value
 
-            if (hc_profile_found is True and event.state &
-                Gdk.ModifierType.CONTROL_MASK and
-                    event.keyval == Gdk.keyval_from_name('h')):
-                self.a11y_profile_high_contrast_activate()
-            elif (sr_profile_found is True and event.state &
-                  Gdk.ModifierType.SUPER_MASK and
-                    event.state & Gdk.ModifierType.MOD1_MASK and
-                    event.keyval == Gdk.keyval_from_name('s')):
-                self.a11y_profile_screen_reader_activate()
+        if (hc_profile_found is True and event.state &
+            Gdk.ModifierType.CONTROL_MASK and
+                event.keyval == Gdk.keyval_from_name('h')):
+            self.a11y_profile_high_contrast_activate()
+        elif (sr_profile_found is True and event.state &
+              Gdk.ModifierType.SUPER_MASK and
+                event.state & Gdk.ModifierType.MOD1_MASK and
+                event.keyval == Gdk.keyval_from_name('s')):
+            self.a11y_profile_screen_reader_activate()
 
     def a11y_profile_set(self, value):
         gsettings.set("com.canonical.a11y-profile-manager",

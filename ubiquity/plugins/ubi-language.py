@@ -35,7 +35,7 @@ try:
     _ver = lsb_release.get_distro_information()['RELEASE']
 except Exception:
     _ver = '12.04'
-_wget_url = 'http://changelogs.ubuntu.com/ubiquity/%s-update-available' % _ver
+_wget_url = f'http://changelogs.ubuntu.com/ubiquity/{_ver}-update-available'
 
 _release_notes_url_path = '/cdrom/.disk/release_notes_url'
 
@@ -206,18 +206,17 @@ class PageGtk(PageBase):
         # Support both iconview and treeview
         if self.only:
             model = self.iconview.get_model()
-            items = self.iconview.get_selected_items()
-            if not items:
+            if items := self.iconview.get_selected_items():
+                iterator = model.get_iter(items[0])
+            else:
                 return None
-            iterator = model.get_iter(items[0])
         else:
             selection = self.treeview.get_selection()
             (model, iterator) = selection.get_selected()
         if iterator is None:
             return None
-        else:
-            value = misc.utf8(model.get_value(iterator, 0))
-            return self.language_choice_map[value][1]
+        value = misc.utf8(model.get_value(iterator, 0))
+        return self.language_choice_map[value][1]
 
     def on_language_activated(self, *args, **kwargs):
         self.controller.go_forward()
@@ -260,7 +259,7 @@ class PageGtk(PageBase):
             text = i18n.get_string(Gtk.Buildable.get_name(w), lang)
             text = text.replace('${RELEASE}', release.name)
             text = text.replace('${MEDIUM}', install_medium)
-            w.get_child().set_markup('<span size="x-large">%s</span>' % text)
+            w.get_child().set_markup(f'<span size="x-large">{text}</span>')
 
         # We need to center each button under each image *and* have a homogeous
         # size between the two buttons.
@@ -315,13 +314,9 @@ class PageGtk(PageBase):
         self.wget_retcode = self.wget_proc.poll()
         if self.wget_retcode is None:
             return True
-        else:
-            if self.wget_retcode == 0:
-                self.update_installer = True
-            else:
-                self.update_installer = False
-            self.update_release_notes_label()
-            return False
+        self.update_installer = self.wget_retcode == 0
+        self.update_release_notes_label()
+        return False
 
     def update_release_notes_label(self):
         print("update_release_notes_label()")
@@ -384,11 +379,7 @@ class PageKde(PageBase):
         self.controller = controller
         self.wget_retcode = None
         self.wget_proc = None
-        if self.controller.oem_user_config:
-            self.only = True
-        else:
-            self.only = False
-
+        self.only = bool(self.controller.oem_user_config)
         try:
             from PyQt5 import uic
             from PyQt5.QtGui import QPixmap, QIcon
@@ -404,7 +395,7 @@ class PageKde(PageBase):
                 self.page.oem_widget.hide()
 
             def init_big_button(button, image_name):
-                pix = QPixmap('/usr/share/ubiquity/qt/images/' + image_name)
+                pix = QPixmap(f'/usr/share/ubiquity/qt/images/{image_name}')
                 icon = QIcon(pix)
                 button.setIcon(icon)
                 button.setIconSize(pix.size())
@@ -415,6 +406,7 @@ class PageKde(PageBase):
             def inst(*args):
                 self.page.try_ubuntu.setEnabled(False)
                 self.controller.go_forward()
+
             self.page.install_ubuntu.clicked.connect(inst)
             self.page.try_ubuntu.clicked.connect(self.on_try_ubuntu_clicked)
             init_big_button(self.page.install_ubuntu, 'install.png')
@@ -582,13 +574,9 @@ class PageKde(PageBase):
         self.wget_retcode = self.wget_proc.poll()
         if self.wget_retcode is None:
             return True
-        else:
-            if self.wget_retcode == 0:
-                self.update_installer = True
-            else:
-                self.update_installer = False
-            self.update_release_notes_label()
-            self.timer.timeout.disconnect(self.check_returncode)
+        self.update_installer = self.wget_retcode == 0
+        self.update_release_notes_label()
+        self.timer.timeout.disconnect(self.check_returncode)
 
     def update_release_notes_label(self):
         lang = self.selected_language()
@@ -776,7 +764,7 @@ class Install(plugin.InstallPlugin):
         if not rv:
             locale_file = "/etc/default/locale"
             if 'UBIQUITY_OEM_USER_CONFIG' not in os.environ:
-                locale_file = "/target%s" % locale_file
+                locale_file = f"/target{locale_file}"
             for key, value in self._pam_env_parse_file(locale_file):
                 if key in ("LANG", "LANGUAGE") or key.startswith("LC_"):
                     os.environ[key] = value

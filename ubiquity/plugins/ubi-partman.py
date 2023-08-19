@@ -266,7 +266,8 @@ class PageGtk(PageBase):
 
     def set_page_title(self, title):
         self.controller._wizard.page_title.set_markup(
-            '<span size="xx-large">%s</span>' % title)
+            f'<span size="xx-large">{title}</span>'
+        )
 
     def move_crypto_widgets(self, auto=True):
         from gi.repository import Gtk
@@ -327,15 +328,19 @@ class PageGtk(PageBase):
     def on_advanced_features_clicked(self, widget):
         from gi.repository import Gtk
 
-        # Save current state of advanced features
-        selected = None
         crypto_selected = self.use_crypto.get_active()
-        for w in (self.advanced_features_radio_none,
-                  self.use_lvm, self.use_zfs):
-            if w.get_active():
-                selected = w
-                break
-
+        selected = next(
+            (
+                w
+                for w in (
+                    self.advanced_features_radio_none,
+                    self.use_lvm,
+                    self.use_zfs,
+                )
+                if w.get_active()
+            ),
+            None,
+        )
         # Only show zfs when available
         zpool_exists = os.path.exists('/sbin/zpool')
         self.use_zfs.set_visible(zpool_exists)
@@ -371,8 +376,7 @@ class PageGtk(PageBase):
         # Set HOME to the live session user's home directory so the
         # filechooser dialog opens at the right location.
         orig_home = os.getenv('HOME')
-        live_user_home = misc.get_live_user_home()
-        if live_user_home:
+        if live_user_home := misc.get_live_user_home():
             os.environ['HOME'] = live_user_home
         save_recovery_dialog = Gtk.FileChooserDialog(label, widget.get_toplevel(),
                                                      Gtk.FileChooserAction.SAVE,
@@ -526,8 +530,7 @@ class PageGtk(PageBase):
                     if key in disk_ids:
                         min_size = extra_resize[key][1]
                         part_size = extra_resize[key][5]
-                        m.append([disk, '<small>%s</small>' %
-                                  misc.format_size(part_size - min_size)])
+                        m.append([disk, f'<small>{misc.format_size(part_size - min_size)}</small>'])
                 self.part_auto_select_drive.set_active(0)
                 self.initialize_resize_mode()
 
@@ -541,8 +544,7 @@ class PageGtk(PageBase):
             self.plugin_is_install = True
             return True
 
-        recovery_key_location_path = self.recovery_key_location.get_text()
-        if recovery_key_location_path:
+        if recovery_key_location_path := self.recovery_key_location.get_text():
             try:
                 with open(recovery_key_location_path, "w") as f:
                     f.write(self.recovery_key.get_text())
@@ -565,27 +567,29 @@ class PageGtk(PageBase):
         return False
 
     def plugin_on_back_clicked(self):
-        if self.current_page in [self.page_auto,
-                                 self.page_bitlocker,
-                                 self.page_crypto]:
-            title = self.controller.get_string(self.plugin_title)
-            self.controller._wizard.page_title.set_markup(
-                '<span size="xx-large">%s</span>' % title)
-            self.current_page = self.page_ask
-            self.controller.go_to_page(self.current_page)
-            # If we arrived at a second partitioning page, then the option
-            # selected on the first page would not cause the forward button to
-            # be marked as Install Now.
-            self.controller.allow_go_forward(True)
-            self.controller.toggle_next_button()
-            self.plugin_is_restart = False
-            self.plugin_is_install = False
-            return True
-        else:
+        if self.current_page not in [
+            self.page_auto,
+            self.page_bitlocker,
+            self.page_crypto,
+        ]:
             # If we're on the first page (ask), then we want to go back to
             # prepare. If we're on the advanced page, then we want to go back
             # to the first page (ask).
             return False
+        title = self.controller.get_string(self.plugin_title)
+        self.controller._wizard.page_title.set_markup(
+            f'<span size="xx-large">{title}</span>'
+        )
+        self.current_page = self.page_ask
+        self.controller.go_to_page(self.current_page)
+        # If we arrived at a second partitioning page, then the option
+        # selected on the first page would not cause the forward button to
+        # be marked as Install Now.
+        self.controller.allow_go_forward(True)
+        self.controller.toggle_next_button()
+        self.plugin_is_restart = False
+        self.plugin_is_install = False
+        return True
 
     def set_disk_layout(self, layout):
         self.disk_layout = layout
@@ -607,8 +611,7 @@ class PageGtk(PageBase):
         val = misc.utf8(m.get_value(i, 0), errors='replace')
 
         partman_id = self.extra_options['use_device'][1][val][0]
-        disk_id = partman_id.rsplit('/', 1)[1]
-        return disk_id
+        return partman_id.rsplit('/', 1)[1]
 
     def count_partitions(self, disk_id):
         return len([
@@ -698,21 +701,20 @@ class PageGtk(PageBase):
             title = self.controller.get_string('ubiquity/text/part_auto_files')
             title = title.replace('${SIZE}', misc.format_size(resize_min_size))
             icon.set_property('icon-name', 'folder')
+        elif 'windows' in title.lower():
+            PATH = (
+                os.environ.get('UBIQUITY_PATH', False) or
+                '/usr/share/ubiquity')
+            icon.logo.set_from_file(os.path.join(
+                PATH, 'pixmaps', 'windows_square.png'))
+        elif 'linux mint' in title.lower():
+            icon.set_property('icon-name', 'distributor-logo')
         else:
-            if 'windows' in title.lower():
-                PATH = (
-                    os.environ.get('UBIQUITY_PATH', False) or
-                    '/usr/share/ubiquity')
-                icon.logo.set_from_file(os.path.join(
-                    PATH, 'pixmaps', 'windows_square.png'))
-            elif 'linux mint' in title.lower():
-                icon.set_property('icon-name', 'distributor-logo')
-            else:
-                icon.set_property('icon-name', 'block-device')
+            icon.set_property('icon-name', 'block-device')
 
         # TODO See if we can get the filesystem label first in misc.py,
         # caching lookups.
-        extra = '%s (%s)' % (resize_path, fs)
+        extra = f'{resize_path} ({fs})'
 
         self.resizewidget.get_child1().get_child().set_property('title', title)
         self.resizewidget.get_child1().get_child().set_property('extra', extra)
@@ -726,8 +728,8 @@ class PageGtk(PageBase):
         except Exception as e:
             dev = 'unknown'
             self.debug('Could not determine new partition number: %s', e)
-            self.debug('extra_options: %s' % str(self.extra_options))
-        extra = '%s (%s)' % (dev, self.default_filesystem)
+            self.debug(f'extra_options: {str(self.extra_options)}')
+        extra = f'{dev} ({self.default_filesystem})'
         self.resizewidget.get_child2().get_child().set_property('extra', extra)
 
         self.partition_container.set_current_page(0)
@@ -756,7 +758,7 @@ class PageGtk(PageBase):
             self.part_auto_hidden_label.set_markup(deleted % partition_count)
         self.partition_container.set_current_page(1)
         # Set the filesystem and size of the partition.
-        ext = '%s (%s)' % (disk_id.replace('=', '/'), self.default_filesystem)
+        ext = f"{disk_id.replace('=', '/')} ({self.default_filesystem})"
         self.partitionbox.set_property('extra', ext)
         # Set the size of the disk.
         i = self.part_auto_select_drive.get_active_iter()
@@ -803,18 +805,16 @@ class PageGtk(PageBase):
             self.grub_device_entry.set_active_iter(i)
 
     def get_grub_choice(self):
-        i = self.grub_device_entry.get_active_iter()
-        if i:
+        if i := self.grub_device_entry.get_active_iter():
             return self.grub_device_entry.get_model().get_value(i, 0)
-        else:
-            self.debug('No active iterator for grub device entry.')
-            disk = self.get_current_disk_partman_id()
-            if isinstance(disk, str) and disk:
-                disk_path = disk.replace("=", "/")
-                if os.path.exists(disk_path):
-                    return misc.grub_default(boot=disk_path)
+        self.debug('No active iterator for grub device entry.')
+        disk = self.get_current_disk_partman_id()
+        if isinstance(disk, str) and disk:
+            disk_path = disk.replace("=", "/")
+            if os.path.exists(disk_path):
+                return misc.grub_default(boot=disk_path)
 
-            return misc.grub_default()
+        return misc.grub_default()
 
     def set_autopartition_heading(self, heading):
         self.part_ask_heading.set_label(heading)
@@ -854,7 +854,7 @@ class PageGtk(PageBase):
         ticked = False
         for option, name in option_to_widget:
             opt_widget = getattr(self, name)
-            opt_desc = getattr(self, name + '_desc', None)
+            opt_desc = getattr(self, f'{name}_desc', None)
 
             if option in options:
                 opt_widget.show()
@@ -896,8 +896,7 @@ class PageGtk(PageBase):
             else:
                 disk_id = self.get_current_disk_partman_id()
                 choice = self.extra_options['resize'][disk_id][0]
-                return (choice, '%s B' % self.resizewidget.get_size(),
-                        'resize_use_free')
+                return choice, f'{self.resizewidget.get_size()} B', 'resize_use_free'
 
         elif self.use_device.get_active() or self.use_zfs.get_active():
             def choose_recipe():
@@ -919,13 +918,7 @@ class PageGtk(PageBase):
                     return (self.extra_options['some_device_crypto'],
                             'use_crypto')
 
-                if want_lvm:
-                    return (self.extra_options['some_device_lvm'],
-                            'use_lvm')
-
-                # Something went horribly wrong, we should have returned
-                # earlier
-                return None
+                return (self.extra_options['some_device_lvm'], 'use_lvm') if want_lvm else None
 
             i = self.part_auto_select_drive.get_active_iter()
             m = self.part_auto_select_drive.get_model()
@@ -968,15 +961,15 @@ class PageGtk(PageBase):
             # whole disk
             cell.set_property('text', partition['device'])
         elif partition['parted']['fs'] != 'free':
-            cell.set_property('text', '  %s' % partition['parted']['path'])
+            cell.set_property('text', f"  {partition['parted']['path']}")
         elif partition['parted']['type'] == 'unusable':
             unusable = self.controller.get_string('partman/text/unusable')
-            cell.set_property('text', '  %s' % unusable)
+            cell.set_property('text', f'  {unusable}')
         else:
             # partman uses "FREE SPACE" which feels a bit too SHOUTY for
             # this interface.
             free_space = self.controller.get_string('partition_free_space')
-            cell.set_property('text', '  %s' % free_space)
+            cell.set_property('text', f'  {free_space}')
 
     def partman_column_type(self, unused_column, cell, model, iterator,
                             user_data):
@@ -1082,7 +1075,7 @@ class PageGtk(PageBase):
                 partition['type'] != 'unusable'):
             for opt in self.grub_options:
                 if partition['path'] in opt:
-                    cell.set_property('text', '%s' % opt[1])
+                    cell.set_property('text', f'{opt[1]}')
                     break
 
     @plugin.only_this_page
@@ -1100,16 +1093,13 @@ class PageGtk(PageBase):
             partition = model[iterator][1]
 
         partition_list_menu = Gtk.Menu()
-        actions = [action for action in
-                   self.controller.dbfilter.get_actions(devpart, partition)]
-        actions.append('separator')
-        actions.append('undo')
+        actions = list(self.controller.dbfilter.get_actions(devpart, partition))
+        actions.extend(('separator', 'undo'))
         for action in self.controller.dbfilter.get_actions(devpart, partition):
             if action == 'separator' and partition_list_menu.get_children():
                 partition_list_menu.append(Gtk.SeparatorMenuItem())
-            widget = 'partition_button_%s' % action
-            signal_callback = getattr(self,
-                                      'on_partition_list_%s_activate' % action)
+            widget = f'partition_button_{action}'
+            signal_callback = getattr(self, f'on_partition_list_{action}_activate')
             new_item = Gtk.MenuItem(self.controller.get_string(widget))
             new_item.connect('activate', signal_callback)
             partition_list_menu.append(new_item)
@@ -1151,11 +1141,7 @@ class PageGtk(PageBase):
         self.recovery_key_location_warning.set_visible(not is_removable)
 
     def show_overwrite_space(self, show_hide):
-        if show_hide:
-            action = 'show'
-        else:
-            action = 'hide'
-
+        action = 'show' if show_hide else 'hide'
         for widget in ['crypto_extra_label',
                        'crypto_overwrite_space', 'crypto_extra_time']:
             getattr(getattr(self, widget), action)()

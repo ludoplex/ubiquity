@@ -59,9 +59,11 @@ class _Telemetry():
         try:
             with open('/proc/uptime') as f:
                 uptime = float(f.read().split()[0])
-        except (FileNotFoundError, OSError, ValueError) as e:
-            syslog.syslog(syslog.LOG_ERR,
-                          "Exception while fetching current uptime: " + str(e))
+        except (OSError, ValueError) as e:
+            syslog.syslog(
+                syslog.LOG_ERR,
+                f"Exception while fetching current uptime: {str(e)}",
+            )
         return uptime
 
     def add_stage(self, stage_name):
@@ -84,9 +86,7 @@ class _Telemetry():
         self._metrics['PartitionMethod'] = method
 
     def _db_get_bool(self, value):
-        if value == 'true':
-            return True
-        return False
+        return value == 'true'
 
     @raise_privileges
     def done(self, db):
@@ -120,7 +120,8 @@ class _Telemetry():
                      stat.S_IRUSR | stat.S_IWUSR |
                      stat.S_IRGRP | stat.S_IROTH)
         except OSError as e:
-            syslog.syslog(syslog.LOG_ERR,
-                          "Exception while storing telemetry data: " + str(e))
+            syslog.syslog(
+                syslog.LOG_ERR, f"Exception while storing telemetry data: {str(e)}"
+            )
 
 # vim:ai:et:sts=4:tw=80:sw=4:

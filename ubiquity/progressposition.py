@@ -81,7 +81,4 @@ class ProgressPosition(object):
         return fraction
 
     def title(self):
-        if not self.positions:
-            # progress bar not started
-            return ''
-        return self.positions[0][4]
+        return '' if not self.positions else self.positions[0][4]

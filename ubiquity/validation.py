@@ -41,15 +41,10 @@ def check_grub_device(device):
         @return True if the device is valid, False if it is not."""
     regex = re.compile(r'^/dev/([a-zA-Z0-9]+|mapper/[a-zA-Z0-9_]+)$')
     if regex.search(device):
-        if not os.path.exists(device):
-            return False
-        return True
+        return bool(os.path.exists(device))
     # (device[,part-num])
     regex = re.compile(r'^\((hd|fd)[0-9]+(,[0-9]+)*\)$')
-    if regex.search(device):
-        return True
-    else:
-        return False
+    return bool(regex.search(device))
 
 
 HOSTNAME_LENGTH = 1
@@ -99,24 +94,17 @@ def password_strength(password):
         else:
             symbol += 1
     length = len(password)
-    if length > 5:
-        length = 5
-    if digit > 3:
-        digit = 3
-    if upper > 3:
-        upper = 3
-    if symbol > 3:
-        symbol = 3
+    length = min(length, 5)
+    digit = min(digit, 3)
+    upper = min(upper, 3)
+    symbol = min(symbol, 3)
     strength = (
         ((length * 0.1) - 0.2) +
         (digit * 0.1) +
         (symbol * 0.15) +
         (upper * 0.1))
-    if strength > 1:
-        strength = 1
-    if strength < 0:
-        strength = 0
-
+    strength = min(strength, 1)
+    strength = max(strength, 0)
     # Recovery keys are 48 digits number and cannot be considered "fair"
     # so set it a level higher
     if len(password) >= 48 and strength < 0.75:
@@ -159,9 +147,9 @@ def gtk_password_validate(controller,
                           password_strength,
                           allow_empty=False,
                           ):
-    complete = True
     passw = password.get_text()
     vpassw = verified_password.get_text()
+    complete = True
     if passw != vpassw:
         complete = False
         password_ok.hide()
@@ -169,10 +157,7 @@ def gtk_password_validate(controller,
             # TODO Cache, use a custom string.
             txt = controller.get_string(
                 'ubiquity/text/password_mismatch')
-            txt = (
-                '<small>'
-                '<span foreground="darkred"><b>%s</b></span>'
-                '</small>' % txt)
+            txt = f'<small><span foreground="darkred"><b>{txt}</b></span></small>'
             password_error_label.set_markup(txt)
             password_error_label.show()
     else:
@@ -186,9 +171,8 @@ def gtk_password_validate(controller,
     else:
         (txt, color) = human_password_strength(passw)
         # TODO Cache
-        txt = controller.get_string('ubiquity/text/password/' + txt)
-        txt = '<small><span foreground="%s"><b>%s</b></span></small>' \
-              % (color, txt)
+        txt = controller.get_string(f'ubiquity/text/password/{txt}')
+        txt = f'<small><span foreground="{color}"><b>{txt}</b></span></small>'
         password_strength.set_markup(txt)
         password_strength.show()
         if passw == vpassw:

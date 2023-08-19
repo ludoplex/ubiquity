@@ -17,20 +17,15 @@ from gi.repository import Gio, GLib, GObject
 
 def utf8(s, errors="strict"):
     """Decode a string as UTF-8 if it isn't already Unicode."""
-    if isinstance(s, str):
-        return s
-    else:
-        return str(s, "utf-8", errors)
+    return s if isinstance(s, str) else str(s, "utf-8", errors)
 
 
 def is_swap(device):
-    try:
+    with contextlib.suppress(Exception):
         with open('/proc/swaps') as fp:
             for line in fp:
-                if line.startswith(device + ' '):
+                if line.startswith(f'{device} '):
                     return True
-    except Exception:
-        pass
     return False
 
 
@@ -38,7 +33,7 @@ _dropped_privileges = 0
 
 
 def set_groups_for_uid(uid):
-    if uid == os.geteuid() or uid == os.getuid():
+    if uid in [os.geteuid(), os.getuid()]:
         return
     user = pwd.getpwuid(uid).pw_name
     try:
@@ -154,9 +149,7 @@ def raise_privileges(func):
 def get_live_user_home():
     """Returns live user home directory, even if executed under SUDO or PKEXEC"""
     uid = os.environ.get('PKEXEC_UID', os.environ.get('SUDO_UID'))
-    if uid is not None:
-        return pwd.getpwuid(int(uid)).pw_dir
-    return os.getenv('HOME', '')
+    return os.getenv('HOME', '') if uid is None else pwd.getpwuid(int(uid)).pw_dir
 
 
 @raise_privileges
@@ -188,7 +181,7 @@ def grub_options():
             if dev and mod:
                 if size.isdigit():
                     size = format_size(int(size))
-                    ret.append([dev, '%s (%s)' % (mod, size)])
+                    ret.append([dev, f'{mod} ({size})'])
                 else:
                     ret.append([dev, mod])
             for part in p.partitions():
@@ -200,7 +193,7 @@ def grub_options():
                 if os.path.exists(p.part_entry(part[1], 'format')):
                     # Don't bother looking for an OS type.
                     pass
-                elif part[5] in oslist.keys():
+                elif part[5] in oslist:
                     ostype = oslist[part[5]]
                 ret.append([part[5], ostype])
     except Exception:
@@ -232,9 +225,7 @@ def boot_device():
         import traceback
         for line in traceback.format_exc().split('\n'):
             syslog.syslog(syslog.LOG_ERR, line)
-    if boot:
-        return boot
-    return root
+    return boot if boot else root
 
 
 def is_removable(device):
@@ -253,30 +244,24 @@ def is_removable(device):
             devpath = line[8:]
         elif line == 'DEVTYPE=partition':
             is_partition = True
-        elif line == 'ID_BUS=usb' or line == 'ID_BUS=ieee1394':
+        elif line in ['ID_BUS=usb', 'ID_BUS=ieee1394']:
             removable_bus = True
 
     if devpath is not None:
         if is_partition:
             devpath = os.path.dirname(devpath)
         is_removable = removable_bus
-        try:
-            with open('/sys%s/removable' % devpath) as removable:
+        with contextlib.suppress(IOError):
+            with open(f'/sys{devpath}/removable') as removable:
                 if removable.readline().strip() != '0':
                     is_removable = True
-        except IOError:
-            pass
         if is_removable:
-            try:
+            with contextlib.suppress(Exception):
                 subp = subprocess.Popen(['udevadm', 'info', '-q', 'name',
                                          '-p', devpath],
                                         stdout=subprocess.PIPE,
                                         universal_newlines=True)
-                return ('/dev/%s' %
-                        subp.communicate()[0].splitlines()[0].strip())
-            except Exception:
-                pass
-
+                return f'/dev/{subp.communicate()[0].splitlines()[0].strip()}'
     return None
 
 
@@ -317,7 +302,7 @@ def partition_to_disk(partition):
             udevadm_part.get('DEVTYPE') != 'partition'):
         return partition
 
-    disk_syspath = '/sys%s' % udevadm_part['DEVPATH'].rsplit('/', 1)[0]
+    disk_syspath = f"/sys{udevadm_part['DEVPATH'].rsplit('/', 1)[0]}"
     udevadm_disk = udevadm_info(['-p', disk_syspath])
     return udevadm_disk.get('DEVNAME', partition)
 
@@ -329,8 +314,7 @@ def is_bitlocker_partition_encrypted(devpath):
         ['blkid', '--match-tag', 'TYPE', devpath],
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         universal_newlines=True)
-    result = subp.communicate()[0].split()
-    if result:
+    if result := subp.communicate()[0].split():
         for line in result:
             if devpath in line:
                 continue
@@ -341,10 +325,7 @@ def is_bitlocker_partition_encrypted(devpath):
 
 
 def is_boot_device_removable(boot=None):
-    if boot:
-        return is_removable(boot)
-    else:
-        return is_removable(boot_device())
+    return is_removable(boot) if boot else is_removable(boot_device())
 
 
 def cdrom_mount_info():
@@ -384,20 +365,15 @@ def grub_default(boot=None):
 
     if boot is not None:
         for device in devices:
-            try:
+            with contextlib.suppress(IndexError, OSError):
                 candidate = os.path.realpath(device.split('\t')[1])
-            except (IndexError, OSError):
-                pass
             if candidate == boot:
                 target = candidate
                 break
 
     if target is None and devices:
-        try:
+        with contextlib.suppress(IndexError, OSError):
             target = os.path.realpath(devices[0].split('\t')[1])
-        except (IndexError, OSError):
-            pass
-
     # last resort
     if target is None:
         target = '(hd0)'
@@ -414,12 +390,8 @@ def grub_default(boot=None):
         # Installing from removable media other than a CD.  Make sure that
         # we don't accidentally install GRUB to it.
         boot = boot_device()
-        try:
-            if boot:
-                target = boot
-            else:
-                # Try the next disk along (which can't also be the CD source).
-                target = os.path.realpath(devices[1].split('\t')[1])
+        with contextlib.suppress(IndexError, OSError):
+            target = boot if boot else os.path.realpath(devices[1].split('\t')[1])
             # Match the more specific patterns first, then move on to the more
             # generic /dev/[a-z]+.
             target = re.sub(r'(\
@@ -427,9 +399,6 @@ def grub_default(boot=None):
                             /dev/nvme[0-9]+n[0-9]+|\
                             /dev/[a-z]+\
                             ).*', r'\1', target)
-        except (IndexError, OSError):
-            pass
-
     return target
 
 
@@ -450,14 +419,11 @@ def find_in_os_prober(device, with_version=False):
         elif is_swap(device):
             ret = 'swap'
         else:
-            syslog.syslog('Device %s not found in os-prober output' % device)
+            syslog.syslog(f'Device {device} not found in os-prober output')
             ret = ''
         ret = utf8(ret, errors='replace')
         ver = utf8(osvers.get(device, ''), errors='replace')
-        if with_version:
-            return ret, ver
-        else:
-            return ret
+        return (ret, ver) if with_version else ret
     except (KeyboardInterrupt, SystemExit):
         pass
     except Exception:
@@ -528,10 +494,11 @@ def get_release():
     if get_release.release_info is None:
         try:
             with open('/cdrom/.disk/info') as fp:
-                line = fp.readline()
-                if line:
+                if line := fp.readline():
                     line = line.split()
-                    get_release.release_info = ReleaseInfo(name=" ".join(line[0:2]), version=line[2])
+                    get_release.release_info = ReleaseInfo(
+                        name=" ".join(line[:2]), version=line[2]
+                    )
         except Exception:
             syslog.syslog(syslog.LOG_ERR, 'Unable to determine the release.')
 
@@ -552,8 +519,7 @@ def get_release_name():
     if not get_release_name.release_name:
         try:
             with open('/cdrom/.disk/info') as fp:
-                line = fp.readline()
-                if line:
+                if line := fp.readline():
                     line = line.split()
                     if line[2] == 'LTS':
                         get_release_name.release_name = ' '.join(line[:3])
@@ -564,8 +530,8 @@ def get_release_name():
                 syslog.LOG_ERR,
                 "Unable to determine the distribution name from "
                 "/cdrom/.disk/info")
-        if not get_release_name.release_name:
-            get_release_name.release_name = 'Linux Mint'
+    if not get_release_name.release_name:
+        get_release_name.release_name = 'Linux Mint'
     return get_release_name.release_name
 
 
@@ -576,10 +542,7 @@ get_release_name.release_name = ''
 def get_install_medium():
     if not get_install_medium.medium:
         try:
-            if os.access('/cdrom', os.W_OK):
-                get_install_medium.medium = 'USB'
-            else:
-                get_install_medium.medium = 'CD'
+            get_install_medium.medium = 'USB' if os.access('/cdrom', os.W_OK) else 'CD'
         except Exception:
             syslog.syslog(
                 syslog.LOG_ERR, "Unable to determine install medium.")
@@ -593,15 +556,12 @@ get_install_medium.medium = ''
 def execute(*args):
     """runs args* in shell mode. Output status is taken."""
 
-    log_args = ['log-output', '-t', 'ubiquity']
-    log_args.extend(args)
-
+    log_args = ['log-output', '-t', 'ubiquity', *args]
     try:
         status = subprocess.call(log_args)
     except IOError as e:
         syslog.syslog(syslog.LOG_ERR, ' '.join(log_args))
-        syslog.syslog(syslog.LOG_ERR,
-                      "OS error(%s): %s" % (e.errno, e.strerror))
+        syslog.syslog(syslog.LOG_ERR, f"OS error({e.errno}): {e.strerror}")
         return False
     else:
         if status != 0:
@@ -912,7 +872,7 @@ def add_connection_watch(func, global_only=True):
             if state == NM_STATE_CONNECTED_GLOBAL:
                 is_connected = True
         else:
-            if state == NM_STATE_CONNECTED_GLOBAL or state == NM_STATE_CONNECTED_SITE:
+            if state in [NM_STATE_CONNECTED_GLOBAL, NM_STATE_CONNECTED_SITE]:
                 is_connected = True
         func(is_connected)
 
@@ -937,12 +897,9 @@ def install_size():
     # Maximal size to 15 GB
     max_size = 15 * 1024 * 1024 * 1024
 
-    try:
+    with contextlib.suppress(IOError):
         with open('/cdrom/casper/filesystem.size') as fp:
             size = int(fp.readline())
-    except IOError:
-        pass
-
     # TODO substitute into the template for the state box.
     min_disk_size = size * 2  # fudge factor
 
@@ -980,14 +937,17 @@ def is_removable_device(path):
     try:
         lsblk_output = subprocess.check_output(cmd.split())
     except subprocess.CalledProcessError:
-        syslog.syslog(syslog.LOG_ERR, "Unable to determine if %s is on a removable device" % path)
+        syslog.syslog(
+            syslog.LOG_ERR,
+            f"Unable to determine if {path} is on a removable device",
+        )
         return False
 
     devices = json.loads(lsblk_output)
-    for entry in devices["blockdevices"]:
-        if entry["mountpoint"] == mp and entry["rm"]:
-            return True
-    return False
+    return any(
+        entry["mountpoint"] == mp and entry["rm"]
+        for entry in devices["blockdevices"]
+    )
 
 
 class SystemdUnitWatcher:
@@ -1037,12 +997,10 @@ class SystemdUnitWatcher:
     def _on_properties_changed(
         self, proxy, changed_properties, invalidated_properties, cb
     ):
-        try:
+        with contextlib.suppress(KeyError):
             if changed_properties["ActiveState"] == "active":
                 self.stop()
                 cb()
-        except KeyError:  # this property didn't change
-            pass
 
     def _on_got_unit_proxy(self, conn, res, cb):
         self.proxy = conn.new_finish(res)
@@ -1073,12 +1031,10 @@ class SystemdUnitWatcher:
             )
         except GLib.Error as e:
             if (
-                e.matches(Gio.io_error_quark(), Gio.IOErrorEnum.DBUS_ERROR) and
-                Gio.DBusError.get_remote_error(e) ==
-                "org.freedesktop.systemd1.NoSuchUnit"
+                not e.matches(Gio.io_error_quark(), Gio.IOErrorEnum.DBUS_ERROR)
+                or Gio.DBusError.get_remote_error(e)
+                != "org.freedesktop.systemd1.NoSuchUnit"
             ):
-                pass  # the unit doesn't exist, tweak this to error if desired
-            else:
                 raise
 
 
@@ -1093,12 +1049,7 @@ def sudo_wrapper(user):
         'XDG_DATA_DIRS',
         'XDG_RUNTIME_DIR',
     ]
-    return [
-        'sudo',
-        '--preserve-env={}'.format(','.join(preserve_env)),
-        '-H',
-        '-u', user
-    ]
+    return ['sudo', f"--preserve-env={','.join(preserve_env)}", '-H', '-u', user]
 
 
 # vim:ai:et:sts=4:tw=80:sw=4:

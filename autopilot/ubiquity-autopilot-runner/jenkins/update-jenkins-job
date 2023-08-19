@@ -76,11 +76,11 @@ def load_job_parameters(path):
         IOError: An error occured while loading the file
     """
     if not os.path.exists(path):
-        raise IOError("file '{}' does not exists!".format(path))
+        raise IOError(f"file '{path}' does not exists!")
     if not os.path.isfile(path):
-        raise IOError("'{}' is not a valid file".format(path))
+        raise IOError(f"'{path}' is not a valid file")
 
-    logging.debug("Loading parameters from '{}'".format(path))
+    logging.debug(f"Loading parameters from '{path}'")
     cfg = yaml.safe_load(open(path, 'r'))
     return False if not cfg else cfg
 
@@ -105,14 +105,13 @@ def load_jenkins_credentials(path, instance=DEFAULT_INSTANCE):
         IOError: An error occured while loading the file
     """
     if not os.path.exists(path):
-        raise IOError("file '{}' does not exists!".format(path))
+        raise IOError(f"file '{path}' does not exists!")
     if not os.path.isfile(path):
-        raise IOError("'{}' is not a valid file".format(path))
+        raise IOError(f"'{path}' is not a valid file")
 
-    logging.debug("Loading credentials from '{}' for instance '{}'".format(
-        path, instance))
+    logging.debug(f"Loading credentials from '{path}' for instance '{instance}'")
     cred = yaml.safe_load(open(path, 'r'))
-    return False if not instance in cred else cred[instance]
+    return False if instance not in cred else cred[instance]
 
 
 def get_jenkins_handle(config):
@@ -132,16 +131,13 @@ def get_jenkins_handle(config):
         logging.error("Please provide a URL to the jenkins instance.")
         return None
 
-    logging.debug("Establishing connection to {}".format(config['url']))
-    if 'username' in config:
-        logging.debug("With user {}".format(config['username']))
-        jenkins_handle = jenkins.Jenkins(
-            config['url'],
-            username=config['username'],
-            password=config['password'])
-    else:
-        jenkins_handle = jenkins.Jenkins(config['url'])
-    return jenkins_handle
+    logging.debug(f"Establishing connection to {config['url']}")
+    if 'username' not in config:
+        return jenkins.Jenkins(config['url'])
+    logging.debug(f"With user {config['username']}")
+    return jenkins.Jenkins(
+        config['url'], username=config['username'], password=config['password']
+    )
 
 
 def get_jinja_environment(tmpldir):
@@ -161,10 +157,9 @@ def get_jinja_environment(tmpldir):
     tmpldir = os.path.abspath(tmpldir)
     logging.debug("Loading Jinja2 environment from '%s'", tmpldir)
     if not os.path.exists(tmpldir):
-        raise IOError(
-            "Template directory '{}' does not exists!".format(tmpldir))
+        raise IOError(f"Template directory '{tmpldir}' does not exists!")
     if not os.path.isdir(tmpldir):
-        raise IOError("'{}' is not a valid directory".format(tmpldir))
+        raise IOError(f"'{tmpldir}' is not a valid directory")
     return jinja2.Environment(loader=jinja2.FileSystemLoader(tmpldir))
 
 
@@ -208,7 +203,7 @@ def main():
     try:
         jparams = load_job_parameters(args.parameters)
     except IOError as exc:
-        logging.error("{}. Exiting!".format(exc))
+        logging.error(f"{exc}. Exiting!")
         sys.exit(1)
 
     if not jparams:
@@ -221,7 +216,7 @@ def main():
             creds = load_jenkins_credentials(os.path.expanduser(credspath),
                                              args.jenkins_instance)
         except IOError as exc:
-            logging.error("{}. Exiting!".format(exc))
+            logging.error(f"{exc}. Exiting!")
             sys.exit(1)
 
         if not creds:
@@ -236,9 +231,9 @@ def main():
         try:
             jjenv = get_jinja_environment(os.path.dirname(args.template))
         except IOError as exc:
-            logging.error("{}. Exiting!".format(exc))
+            logging.error(f"{exc}. Exiting!")
             sys.exit(1)
-        if 'token' in creds and not 'token' in jparams:
+        if 'token' in creds and 'token' not in jparams:
             jparams['token'] = creds['token']
         if not setup_job(jkh, jjenv, args.name, args.template, jparams,
                          args.update_jobs, args.output, args.dry_run):
@@ -307,28 +302,27 @@ def setup_job(jkh, jjenv, name, template, params, update=False, output=None, dry
     if output is not None:
         with open(output, 'w') as f_out:
             f_out.write(jkcfg)
-    else:
-        if not jkh.job_exists(jobname):
-            logging.info("Creating Jenkins Job %s ", jobname)
-            if not dry_run:
-                jkh.create_job(jobname, jkcfg)
+    elif jkh.job_exists(jobname):
+        if update:
+            if not is_job_idle(jkh, jobname):
+                logging.warning("Job is running. Skipping reconfiguration!")
+                return False
             else:
-                logging.warning("dry run mode enabled. Job will not be created")
-        else:
-            if update:
-                if not is_job_idle(jkh, jobname):
-                    logging.warning("Job is running. Skipping reconfiguration!")
-                    return False
+                logging.info("Reconfiguring Jenkins Job %s ", jobname)
+                if not dry_run:
+                    jkh.reconfig_job(jobname, jkcfg)
                 else:
-                    logging.info("Reconfiguring Jenkins Job %s ", jobname)
-                    if not dry_run:
-                        jkh.reconfig_job(jobname, jkcfg)
-                    else:
-                        logging.warning("dry run mode enabled. Job will not be "
-                                        "updated")
-            else:
-                logging.debug('update set to %s. Skipping reconfiguration of '
-                              '%s', update, jobname)
+                    logging.warning("dry run mode enabled. Job will not be "
+                                    "updated")
+        else:
+            logging.debug('update set to %s. Skipping reconfiguration of '
+                          '%s', update, jobname)
+    else:
+        logging.info("Creating Jenkins Job %s ", jobname)
+        if not dry_run:
+            jkh.create_job(jobname, jkcfg)
+        else:
+            logging.warning("dry run mode enabled. Job will not be created")
     return True
 
 

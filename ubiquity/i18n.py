@@ -44,8 +44,7 @@ def reset_locale(frontend):
         try:
             locale.setlocale(locale.LC_ALL, '')
         except locale.Error as e:
-            print('locale.setlocale failed: %s (LANG=%s)' % (e, di_locale),
-                  file=sys.stderr)
+            print(f'locale.setlocale failed: {e} (LANG={di_locale})', file=sys.stderr)
         im_switch.start_im()
     return di_locale
 
@@ -103,76 +102,80 @@ def get_translations(languages=None, core_names=[], extra_prefixes=[]):
             'partman-target/text/method',
             'grub-installer/bootdev',
         ))
-        prefixes = reduce(lambda x, y: x + '|' + y, extra_prefixes, prefixes)
+        prefixes = reduce(lambda x, y: f'{x}|{y}', extra_prefixes, prefixes)
 
         _translations = {}
-        devnull = open('/dev/null', 'w')
-        db = subprocess.Popen(
-            ['debconf-copydb', 'templatedb', 'pipe',
-             '--config=Name:pipe', '--config=Driver:Pipe',
-             '--config=InFd:none',
-             '--pattern=^(%s)' % prefixes],
-            bufsize=8192, stdout=subprocess.PIPE, stderr=devnull,
-            # necessary?
-            preexec_fn=misc.regain_privileges)
-        question = None
-        descriptions = {}
-        fieldsplitter = re.compile(br':\s*')
+        with open('/dev/null', 'w') as devnull:
+            db = subprocess.Popen(
+                [
+                    'debconf-copydb',
+                    'templatedb',
+                    'pipe',
+                    '--config=Name:pipe',
+                    '--config=Driver:Pipe',
+                    '--config=InFd:none',
+                    f'--pattern=^({prefixes})',
+                ],
+                bufsize=8192,
+                stdout=subprocess.PIPE,
+                stderr=devnull,
+                preexec_fn=misc.regain_privileges,
+            )
+            question = None
+            descriptions = {}
+            fieldsplitter = re.compile(br':\s*')
 
-        for line in db.stdout:
-            line = line.rstrip(b'\n')
-            if b':' not in line:
-                if question is not None:
-                    _translations[question] = descriptions
-                    descriptions = {}
-                    question = None
-                continue
+            for line in db.stdout:
+                line = line.rstrip(b'\n')
+                if b':' not in line:
+                    if question is not None:
+                        _translations[question] = descriptions
+                        descriptions = {}
+                        question = None
+                    continue
 
-            (name, value) = fieldsplitter.split(line, 1)
-            if value == b'':
-                continue
-            name = name.lower()
-            if name == b'name':
-                question = value.decode()
-            elif name.startswith(b'description'):
-                namebits = name.split(b'-', 1)
-                if len(namebits) == 1:
-                    lang = 'c'
-                    decoded_value = value.decode('ASCII', 'replace')
-                else:
-                    lang = namebits[1].lower().decode()
-                    lang, encoding = lang.split('.', 1)
-                    decoded_value = value.decode(encoding, 'replace')
-                if (use_langs is None or lang in use_langs or
-                        question in core_names):
-                    decoded_value = strip_context(question, decoded_value)
-                    descriptions[lang] = decoded_value.replace('\\n', '\n')
-            elif name.startswith(b'extended_description'):
-                namebits = name.split(b'-', 1)
-                if len(namebits) == 1:
-                    lang = 'c'
-                    decoded_value = value.decode('ASCII', 'replace')
-                else:
-                    lang = namebits[1].lower().decode()
-                    lang, encoding = lang.split('.', 1)
-                    decoded_value = value.decode(encoding, 'replace')
-                if (use_langs is None or lang in use_langs or
-                        question in core_names):
-                    decoded_value = strip_context(question, decoded_value)
-                    if lang not in descriptions:
+                (name, value) = fieldsplitter.split(line, 1)
+                if value == b'':
+                    continue
+                name = name.lower()
+                if name == b'name':
+                    question = value.decode()
+                elif name.startswith(b'description'):
+                    namebits = name.split(b'-', 1)
+                    if len(namebits) == 1:
+                        lang = 'c'
+                        decoded_value = value.decode('ASCII', 'replace')
+                    else:
+                        lang = namebits[1].lower().decode()
+                        lang, encoding = lang.split('.', 1)
+                        decoded_value = value.decode(encoding, 'replace')
+                    if (use_langs is None or lang in use_langs or
+                            question in core_names):
+                        decoded_value = strip_context(question, decoded_value)
                         descriptions[lang] = decoded_value.replace('\\n', '\n')
-                    # TODO cjwatson 2006-09-04: a bit of a hack to get the
-                    # description and extended description separately ...
-                    if question in ('grub-installer/bootdev',
+                elif name.startswith(b'extended_description'):
+                    namebits = name.split(b'-', 1)
+                    if len(namebits) == 1:
+                        lang = 'c'
+                        decoded_value = value.decode('ASCII', 'replace')
+                    else:
+                        lang = namebits[1].lower().decode()
+                        lang, encoding = lang.split('.', 1)
+                        decoded_value = value.decode(encoding, 'replace')
+                    if (use_langs is None or lang in use_langs or
+                        question in core_names):
+                        decoded_value = strip_context(question, decoded_value)
+                        if lang not in descriptions:
+                            descriptions[lang] = decoded_value.replace('\\n', '\n')
+                                            # TODO cjwatson 2006-09-04: a bit of a hack to get the
+                                            # description and extended description separately ...
+                        if question in ('grub-installer/bootdev',
                                     'partman-newworld/no_newworld',
                                     'ubiquity/text/error_updating_installer'):
-                        descriptions["extended:%s" % lang] = \
-                            decoded_value.replace('\\n', '\n')
+                            descriptions[f"extended:{lang}"] = decoded_value.replace('\\n', '\n')
 
-        db.stdout.close()
-        db.wait()
-        devnull.close()
-
+            db.stdout.close()
+            db.wait()
     return _translations
 
 
@@ -208,14 +211,13 @@ def map_widget_name(prefix, name):
     if prefix is None:
         prefix = 'ubiquity/text'
     if '/' in name and not name.startswith('password/'):
-        question = name
+        return name
     elif name in string_questions:
-        question = string_questions[name]
+        return string_questions[name]
     else:
         if name.endswith('1'):
             name = name[:-1]
-        question = '%s/%s' % (prefix, name)
-    return question
+        return f'{prefix}/{name}'
 
 
 def get_string(name, lang, prefix=None):
@@ -228,12 +230,9 @@ def get_string(name, lang, prefix=None):
     if question not in translations:
         return None
 
-    if lang is None:
-        lang = 'c'
-    else:
-        lang = lang.lower()
+    lang = 'c' if lang is None else lang.lower()
     if name in string_extended:
-        lang = 'extended:%s' % lang
+        lang = f'extended:{lang}'
 
     if lang in translations[question]:
         text = translations[question][lang]
@@ -259,10 +258,7 @@ def ascii_transliterate(exc):
         raise TypeError("don't know how to handle %r" % exc)
     import unicodedata
     s = unicodedata.normalize('NFD', exc.object[exc.start])[:1]
-    if ord(s) in range(128):
-        return s, exc.start + 1
-    else:
-        return '', exc.start + 1
+    return (s, exc.start + 1) if ord(s) in range(128) else ('', exc.start + 1)
 
 
 codecs.register_error('ascii_transliterate', ascii_transliterate)
@@ -289,7 +285,7 @@ def get_languages(current_language_index=-1, only_installable=False):
     i = 0
     for line in languagelist:
         line = misc.utf8(line)
-        if line == '' or line == '\n':
+        if line in ['', '\n']:
             continue
         code, name, trans = line.strip('\n').split(':')[1:]
         if code in ('C', 'dz', 'km'):
@@ -303,7 +299,7 @@ def get_languages(current_language_index=-1, only_installable=False):
         trans = trans.strip(" \ufeff")
 
         if only_installable:
-            pkg_name = 'language-pack-%s' % code
+            pkg_name = f'language-pack-{code}'
             # special case these
             if pkg_name.endswith('_CN'):
                 pkg_name = 'language-pack-zh-hans'
@@ -363,7 +359,7 @@ def default_locales():
         defaults = {}
         for line in languagelist:
             line = misc.utf8(line)
-            if line == '' or line == '\n':
+            if line in ['', '\n']:
                 continue
             bits = line.strip('\n').split(';')
             code = bits[0]

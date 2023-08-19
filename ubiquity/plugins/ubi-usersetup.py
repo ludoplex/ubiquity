@@ -75,12 +75,9 @@ class PageBase(plugin.PluginUI):
     def __init__(self):
         self.suffix = misc.dmimodel()
         if self.suffix:
-            self.suffix = '-%s' % self.suffix
+            self.suffix = f'-{self.suffix}'
         else:
-            if misc.execute("laptop-detect"):
-                self.suffix = '-laptop'
-            else:
-                self.suffix = '-desktop'
+            self.suffix = '-laptop' if misc.execute("laptop-detect") else '-desktop'
         self.allow_password_empty = False
         self.hostname_error_text = ""
         self.domain_connection_error_text = ""
@@ -248,7 +245,7 @@ class PageGtk(PageBase):
             self.username.set_editable(False)
             self.username.set_sensitive(False)
             self.username_edited = True
-            self.hostname.set_text('oem%s' % self.suffix)
+            self.hostname.set_text(f'oem{self.suffix}')
             self.hostname_edited = True
             self.login_vbox.hide()
             # The UserSetup component takes care of preseeding passwd/user-uid.
@@ -294,19 +291,19 @@ class PageGtk(PageBase):
 
     def username_error(self, msg):
         self.username_ok.hide()
-        m = '<small><span foreground="darkred"><b>%s</b></span></small>' % msg
+        m = f'<small><span foreground="darkred"><b>{msg}</b></span></small>'
         self.username_error_label.set_markup(m)
         self.username_error_label.show()
 
     def hostname_error(self, msg):
         self.hostname_ok.hide()
-        m = '<small><span foreground="darkred"><b>%s</b></span></small>' % msg
+        m = f'<small><span foreground="darkred"><b>{msg}</b></span></small>'
         self.hostname_error_label.set_markup(m)
         self.hostname_error_label.show()
 
     def password_error(self, msg):
         self.password_strength.hide()
-        m = '<small><span foreground="darkred"><b>%s</b></span></small>' % msg
+        m = f'<small><span foreground="darkred"><b>{msg}</b></span></small>'
         self.password_error_label.set_markup(m)
         self.password_error_label.show()
 
@@ -334,13 +331,13 @@ class PageGtk(PageBase):
 
     def domain_name_error(self, msg):
         self.domain_name_ok.hide()
-        m = '<small><span foreground="darkred"><b>%s</b></span></small>' % msg
+        m = f'<small><span foreground="darkred"><b>{msg}</b></span></small>'
         self.domain_name_error_label.set_markup(m)
         self.domain_name_error_label.show()
 
     def domain_user_error(self, msg):
         self.domain_user_ok.hide()
-        m = '<small><span foreground="darkred"><b>%s</b></span></small>' % msg
+        m = f'<small><span foreground="darkred"><b>{msg}</b></span></small>'
         self.domain_user_error_label.set_markup(m)
         self.domain_user_error_label.show()
 
@@ -361,23 +358,21 @@ class PageGtk(PageBase):
                 self.hostname_changed_id is None):
             return
 
-        if (widget is not None and widget.get_name() == 'fullname' and
-                not self.username_edited):
-            self.username.handler_block(self.username_changed_id)
-            new_username = misc.utf8(widget.get_text().split(' ')[0])
-            new_username = new_username.encode('ascii', 'ascii_transliterate')
-            new_username = new_username.decode().lower()
-            new_username = re.sub('^[^a-z]+', '', new_username)
-            new_username = re.sub('[^-a-z0-9_]', '', new_username)
-            self.username.set_text(new_username)
-            self.username.handler_unblock(self.username_changed_id)
-        elif (widget is not None and widget.get_name() == 'username' and
-              not self.hostname_edited):
-            self.hostname.handler_block(self.hostname_changed_id)
-            t = widget.get_text()
-            if t:
-                self.hostname.set_text(re.sub(r'\W', '', t) + self.suffix)
-            self.hostname.handler_unblock(self.hostname_changed_id)
+        if widget is not None:
+            if widget.get_name() == 'fullname' and not self.username_edited:
+                self.username.handler_block(self.username_changed_id)
+                new_username = misc.utf8(widget.get_text().split(' ')[0])
+                new_username = new_username.encode('ascii', 'ascii_transliterate')
+                new_username = new_username.decode().lower()
+                new_username = re.sub('^[^a-z]+', '', new_username)
+                new_username = re.sub('[^-a-z0-9_]', '', new_username)
+                self.username.set_text(new_username)
+                self.username.handler_unblock(self.username_changed_id)
+            elif widget.get_name() == 'username' and not self.hostname_edited:
+                self.hostname.handler_block(self.hostname_changed_id)
+                if t := widget.get_text():
+                    self.hostname.set_text(re.sub(r'\W', '', t) + self.suffix)
+                self.hostname.handler_unblock(self.hostname_changed_id)
 
         # Do some initial validation.  We have to process all the widgets so we
         # can know if we can really show the next button.  Otherwise we'd show
@@ -389,10 +384,8 @@ class PageGtk(PageBase):
         else:
             self.fullname_ok.hide()
 
-        text = self.username.get_text()
-        if text:
-            errors = check_username(text)
-            if errors:
+        if text := self.username.get_text():
+            if errors := check_username(text):
                 self.username_error(make_error_string(self.controller, errors))
                 complete = False
             else:
@@ -418,8 +411,7 @@ class PageGtk(PageBase):
         txt = self.hostname.get_text()
         self.hostname_ok.show()
         if txt:
-            errors = check_hostname(txt)
-            if errors:
+            if errors := check_hostname(txt):
                 self.hostname_error(make_error_string(self.controller, errors))
                 complete = False
                 self.hostname_ok.hide()
@@ -468,7 +460,7 @@ class PageGtk(PageBase):
     def hostname_timeout(self, widget):
         if self.hostname_ok.get_property('visible') and self.resolver_ok:
             hostname = widget.get_text()
-            for host in (hostname, '%s.local' % hostname):
+            for host in (hostname, f'{hostname}.local'):
                 self.resolver.lookup_by_name_async(
                     host, None, self.lookup_result, None)
 
@@ -499,8 +491,7 @@ class PageGtk(PageBase):
 
         self.domain_name_ok.hide()
         if domain_name_txt:
-            errors = check_hostname(domain_name_txt)
-            if errors:
+            if errors := check_hostname(domain_name_txt):
                 self.domain_name_error(make_error_string(self.controller, errors))
                 domain_name_is_valid = False
             else:
@@ -512,9 +503,7 @@ class PageGtk(PageBase):
         domain_info_complete = domain_name_is_valid
 
         if domain_user_txt:
-            # Don't enforce lower case for AD administrator.
-            errors = check_username(domain_user_txt.lower())
-            if errors:
+            if errors := check_username(domain_user_txt.lower()):
                 self.domain_user_error(make_error_string(self.controller, errors))
                 domain_info_complete = False
             else:
@@ -613,7 +602,7 @@ class PageKde(PageBase):
             self.username_edited = True
             self.hostname_edited = True
 
-            self.page.hostname.setText('oem%s' % self.suffix)
+            self.page.hostname.setText(f'oem{self.suffix}')
 
             # The UserSetup component takes care of preseeding passwd/user-uid.
             misc.execute_root('apt-install', 'oem-config-kde')
@@ -791,9 +780,7 @@ class PageNoninteractive(PageBase):
 
     def get_username(self):
         """Get the user's Unix user name."""
-        if self.controller.oem_config:
-            return 'oem'
-        return self.username
+        return 'oem' if self.controller.oem_config else self.username
 
     def get_password(self):
         """Get the user's password."""
@@ -856,8 +843,7 @@ class Page(plugin.Plugin):
                         hostname = self.db.get('netcfg/get_hostname')
                         domain = self.db.get('netcfg/get_domain')
                         if hostname and domain:
-                            hostname = '%s.%s' % (hostname.rstrip('.'),
-                                                  domain.strip('.'))
+                            hostname = f"{hostname.rstrip('.')}.{domain.strip('.')}"
                         if hostname != '':
                             self.ui.set_hostname(hostname)
                 except debconf.DebconfError:
@@ -953,11 +939,7 @@ class Page(plugin.Plugin):
 
         hostname = self.ui.get_hostname()
 
-        # check if the hostname had errors
-        errors = check_hostname(hostname)
-
-        # showing warning message is error is set
-        if errors:
+        if errors := check_hostname(hostname):
             self.ui.hostname_error(
                 make_error_string(self.ui.controller, errors))
             self.done = False

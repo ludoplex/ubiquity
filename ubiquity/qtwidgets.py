@@ -33,15 +33,10 @@ class StateBox(QWidget):
 
     def set_state(self, state):
         self.status = state
-        if state:
-            # A tickmark
-            name = "dialog-ok-apply.svg"
-        else:
-            # A cross
-            name = "edit-delete.svg"
-        icon = "/usr/share/icons/breeze/actions/22/" + name
+        name = "dialog-ok-apply.svg" if state else "edit-delete.svg"
+        icon = f"/usr/share/icons/breeze/actions/22/{name}"
         if not os.path.isfile(icon):
-            icon = "/usr/share/icons/breeze/actions/toolbar/" + name
+            icon = f"/usr/share/icons/breeze/actions/toolbar/{name}"
         self.image.load(icon)
 
     def get_state(self):

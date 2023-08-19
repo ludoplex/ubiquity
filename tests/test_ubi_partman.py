@@ -31,7 +31,7 @@ def question_has_variables(question, lookup_variables):
             if found_question and line == b'\n':
                 break
 
-            if line.startswith(('Name: %s' % question).encode()):
+            if line.startswith(f'Name: {question}'.encode()):
                 found_question = True
                 continue
             elif not found_question:
@@ -46,19 +46,18 @@ def question_has_variables(question, lookup_variables):
 
             while True:
                 start = line.find(b'${', last)
-                if start != -1:
-                    end = line.find(b'}', last)
-                    if end != -1:
-                        existing_variables.append(line[start + 2:end].decode())
-                        last = end + 1
-                    else:
-                        exc = ('Expected to find } on \'%s\'' %
-                               line.decode(errors='replace'))
-                        raise EOFError(exc)
-                else:
+                if start == -1:
                     break
+                end = line.find(b'}', last)
+                if end != -1:
+                    existing_variables.append(line[start + 2:end].decode())
+                    last = end + 1
+                else:
+                    exc = ('Expected to find } on \'%s\'' %
+                           line.decode(errors='replace'))
+                    raise EOFError(exc)
     if not found_question:
-        raise AssertionError('Never found the question: %s' % question)
+        raise AssertionError(f'Never found the question: {question}')
     only_in_lookup = set(lookup_variables) - set(existing_variables)
     only_in_template = set(existing_variables) - set(lookup_variables)
     if only_in_lookup or only_in_template:
@@ -95,9 +94,10 @@ class PartmanPageDirectoryTests(unittest.TestCase):
         def side_effect_factory(real_method):
             def side_effect(path, *args, **kw):
                 if path.startswith('/lib/partman'):
-                    return real_method('%s%s' % (prefix, path), *args, **kw)
+                    return real_method(f'{prefix}{path}', *args, **kw)
                 else:
                     return real_method(path, *args, **kw)
+
             return side_effect
 
         for method in ('listdir', 'path.isdir', 'access', 'path.exists'):
@@ -105,7 +105,7 @@ class PartmanPageDirectoryTests(unittest.TestCase):
                 real_method = getattr(os.path, method.split('.')[1])
             else:
                 real_method = getattr(os, method)
-            method = mock.patch('os.%s' % method)
+            method = mock.patch(f'os.{method}')
             mocked_method = method.start()
             mocked_method.side_effect = side_effect_factory(real_method)
             self.addCleanup(method.stop)
@@ -480,12 +480,10 @@ class TestCalculateAutopartitioningOptions(unittest.TestCase):
         misc.find_in_os_prober.return_value = operating_system
         part = ubi_partman.Partition('/dev/sda1', 0, '1234-1234', 'ntfs')
         layout = {'=dev=sda': [part]}
-        self.page.extra_options = {}
-        self.page.extra_options['use_device'] = ('debconf-return-value',
-                                                 [{'disk-desc': 0}])
-        self.page.extra_options['resize'] = {
-            '=dev=sda': ['', 0, 0, 0, '', 0, 'ntfs']}
-
+        self.page.extra_options = {
+            'use_device': ('debconf-return-value', [{'disk-desc': 0}]),
+            'resize': {'=dev=sda': ['', 0, 0, 0, '', 0, 'ntfs']},
+        }
         question = 'ubiquity/partitioner/single_os_resize'
         question_has_variables(question, ['OS', 'DISTRO'])
         # Ensure that we're not grabbing the value from previous runs.
@@ -503,7 +501,7 @@ class TestCalculateAutopartitioningOptions(unittest.TestCase):
         replace = ubi_partman.PartitioningOption(title, desc)
 
         operating_systems, ubuntu_systems = \
-            self.page.calculate_operating_systems(layout)
+                self.page.calculate_operating_systems(layout)
         options = self.page.calculate_autopartitioning_options(
             operating_systems, ubuntu_systems)
         self.assertIn('resize', options)
@@ -515,9 +513,9 @@ class TestCalculateAutopartitioningOptions(unittest.TestCase):
 
     # 'This computer currently has no operating systems on it.'
     def test_empty(self):
-        self.page.extra_options = {}
-        self.page.extra_options['use_device'] = ('debconf-return-value',
-                                                 [{'disk-desc': 0}])
+        self.page.extra_options = {
+            'use_device': ('debconf-return-value', [{'disk-desc': 0}])
+        }
         question = 'ubiquity/partitioner/multiple_os_format'
         question_has_variables(question, ['DISTRO'])
         self.page.db.subst(question, 'DISTRO', self.release.name)
@@ -525,7 +523,7 @@ class TestCalculateAutopartitioningOptions(unittest.TestCase):
         desc = self.page.extended_description(question)
         use_device = ubi_partman.PartitioningOption(title, desc)
         operating_systems, ubuntu_systems = \
-            self.page.calculate_operating_systems([])
+                self.page.calculate_operating_systems([])
         options = self.page.calculate_autopartitioning_options(
             operating_systems, ubuntu_systems)
 
@@ -743,9 +741,8 @@ def _fake_grub_options_pairs(paths, descriptions):
     # only cares about sub-sequences of length 1, where the path is
     # element zero.
     def grub_options():
-        return [(path, description)
-                for path, description
-                in zip_longest(paths, descriptions, fillvalue='')]
+        return list(zip_longest(paths, descriptions, fillvalue=''))
+
     return grub_options
 
 
@@ -790,9 +787,7 @@ class TestPageGtk(unittest.TestCase):
             '/dev/vda1 ',
             '/dev/vdb1 ',
         ]
-        row_text = []
-        for row in self.gtk.grub_device_entry.get_model():
-            row_text.append(' '.join(row))
+        row_text = [' '.join(row) for row in self.gtk.grub_device_entry.get_model()]
         for want, got in zip(expected, row_text):
             self.assertEqual(want, got)
 

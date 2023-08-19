@@ -99,7 +99,7 @@ class GtkFrontendTests(CoreFrontendTests):
         seen = []
         while True:
             h = self.frontend.history[-1]
-            self.assertNotIn(h, seen, 'already been to %s' % h[1].name)
+            self.assertNotIn(h, seen, f'already been to {h[1].name}')
             seen.append(h)
             self.frontend.pop_history()
             if h[0].filter_class.__module__ == 'ubi-usersetup':
@@ -111,12 +111,14 @@ class GtkFrontendTests(CoreFrontendTests):
                 break
 
     def testNoActiveItemRegionCombo(self):
-        # bzr r4066, LP #521851
-        idx = -1
-        for page in self.frontend.pages:
-            if page.module.NAME == 'timezone':
-                idx = self.frontend.pages.index(page)
-                break
+        idx = next(
+            (
+                self.frontend.pages.index(page)
+                for page in self.frontend.pages
+                if page.module.NAME == 'timezone'
+            ),
+            -1,
+        )
         self.assertNotEqual(-1, idx)
         ui = self.frontend.pages[idx].ui
         dbfilter = self.frontend.dbfilter
@@ -128,12 +130,14 @@ class GtkFrontendTests(CoreFrontendTests):
         dbfilter.ui.on_region_combo_changed()
 
     def testPluginTranslate(self):
-        # bzr r4061, LP #540929
-        idx = -1
-        for page in self.frontend.pages:
-            if page.module.NAME == 'usersetup':
-                idx = self.frontend.pages.index(page)
-                break
+        idx = next(
+            (
+                self.frontend.pages.index(page)
+                for page in self.frontend.pages
+                if page.module.NAME == 'usersetup'
+            ),
+            -1,
+        )
         self.assertNotEqual(-1, idx)
         self.frontend.pagesindex = idx
         ui = self.frontend.pages[idx].ui
@@ -150,8 +154,7 @@ class GtkFrontendTests(CoreFrontendTests):
         self.frontend.translate_pages(reget=True)
         esstrs = [x.inactive_message for x in widgets]
         common = set(cstrs) & set(esstrs)
-        self.assertEqual(
-            set(), common, 'Untranslated strings: %s' % ', '.join(common))
+        self.assertEqual(set(), common, f"Untranslated strings: {', '.join(common)}")
 
 
 if __name__ == '__main__':

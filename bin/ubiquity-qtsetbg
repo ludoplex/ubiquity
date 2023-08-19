@@ -33,13 +33,13 @@ def create_window(wallpaper, geometry):
 
 def main():
     if len(sys.argv) != 2:
-        die('usage: {} <path/to/wallpaper.png>'.format(sys.argv[0]))
+        die(f'usage: {sys.argv[0]} <path/to/wallpaper.png>')
     path = sys.argv[1]
 
     app = QtWidgets.QApplication(sys.argv)
     wallpaper = QtGui.QPixmap(path)
     if wallpaper.isNull():
-        die('Failed to load {}'.format(path))
+        die(f'Failed to load {path}')
 
     desktop = app.desktop()
     # Keep a trace of the windows to ensure they are not garbage collected

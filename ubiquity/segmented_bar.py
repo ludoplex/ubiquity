@@ -73,10 +73,7 @@ class CairoExtensions:
         color_shift[0] = brightness
         color_shift[1] = brightness
         color_shift[2] = brightness
-        if saturation == 0:
-            i = 3
-        else:
-            i = 0
+        i = 3 if saturation == 0 else 0
         while i < 3:
             m3 = hue_shift[i]
             if m3 > 360:
@@ -92,7 +89,7 @@ class CairoExtensions:
                 color_shift[i] = m1 + (m2 - m1) * (240 - m3) / 60
             else:
                 color_shift[i] = m1
-            i = i + 1
+            i += 1
 
         return Color(color_shift[0], color_shift[1], color_shift[2])
 
@@ -129,9 +126,9 @@ class CairoExtensions:
                 hue = 2 + (blue - red) / delta
             elif blue == max:
                 hue = 4 + (red - green) / delta
-            hue = hue * 60
+            hue *= 60
             if hue < 0:
-                hue = hue + 360
+                hue += 360
         return (hue, saturation, brightness)
 
     @staticmethod
@@ -139,12 +136,6 @@ class CairoExtensions:
         # FIXME evand 2008-07-19: This function currently produces only deep
         # reds for non-white colors.
         return color
-        h, s, b = CairoExtensions.hsb_from_color(color)
-        b = max(min(b * ratio, 1), 0)
-        s = max(min(s * ratio, 1), 0)
-        c = CairoExtensions.color_from_hsb(h, s, b)
-        c.a = color.a
-        return c
 
     @staticmethod
     def rgba_to_color(color):
@@ -278,11 +269,10 @@ class SegmentedBar(Gtk.DrawingArea):
         layout = self.create_pango_layout('')
         for i in range(len(self.segments)):
             title = self.segments[i].title
-            layout.set_markup('<b>%s</b>' % title, -1)
+            layout.set_markup(f'<b>{title}</b>', -1)
             aw, ah = layout.get_pixel_size()
 
-            layout.set_markup(
-                '<small>%s</small>' % self.segments[i].subtitle, -1)
+            layout.set_markup(f'<small>{self.segments[i].subtitle}</small>', -1)
             bw, bh = layout.get_pixel_size()
 
             w = max(aw, bw)
@@ -293,12 +283,12 @@ class SegmentedBar(Gtk.DrawingArea):
 
             if i < (len(self.segments) - 1):
                 self.layout_width = self.layout_width + \
-                    self.segments[i].layout_width + self.segment_box_size + \
-                    self.segment_box_spacing + self.segment_label_spacing
+                        self.segments[i].layout_width + self.segment_box_size + \
+                        self.segment_box_spacing + self.segment_label_spacing
             else:
                 self.layout_width = self.layout_width + \
-                    self.segments[i].layout_width + self.segment_box_size + \
-                    self.segment_box_spacing + 0
+                        self.segments[i].layout_width + self.segment_box_size + \
+                        self.segment_box_spacing + 0
             self.layout_height = max(
                 self.layout_height, self.segments[i].layout_height)
 
@@ -366,11 +356,7 @@ class SegmentedBar(Gtk.DrawingArea):
 
         cr.set_line_width(1)
         seg_w = 20
-        if seg_w > r:
-            x = seg_w
-        else:
-            x = r
-
+        x = max(seg_w, r)
         while x <= w - r:
             cr.move_to(x - 0.5, 1)
             cr.line_to(x - 0.5, h - 1)
@@ -409,7 +395,7 @@ class SegmentedBar(Gtk.DrawingArea):
 
             x = x + self.segment_box_size + self.segment_box_spacing
 
-            layout.set_markup('<b>%s</b>' % segment.title, -1)
+            layout.set_markup(f'<b>{segment.title}</b>', -1)
             (lw, lh) = layout.get_pixel_size()
 
             cr.move_to(x, 0)
@@ -417,7 +403,7 @@ class SegmentedBar(Gtk.DrawingArea):
             PangoCairo.show_layout(cr, layout)
             cr.fill()
 
-            layout.set_markup('<small>%s</small>' % segment.subtitle, -1)
+            layout.set_markup(f'<small>{segment.subtitle}</small>', -1)
 
             cr.move_to(x, lh)
             Gdk.cairo_set_source_rgba(cr, self.subtext_color)
@@ -430,8 +416,7 @@ class SegmentedBar(Gtk.DrawingArea):
         cr = cairo.Context(s)
         self.render_bar_segments(cr, w, h, h / 2)
         self.render_bar_strokes(cr, w, h, h / 2)
-        pattern = cairo.SurfacePattern(s)
-        return pattern
+        return cairo.SurfacePattern(s)
 
     def do_draw(self, cr):
         if self.reflect:
@@ -482,12 +467,11 @@ class SegmentedBar(Gtk.DrawingArea):
         if self.show_labels:
             allocation = self.get_allocation()
             if self.reflect:
+                height = self.bar_height + self.bar_label_spacing
                 if self.center_labels:
                     width = (allocation.width - self.layout_width) / 2
-                    height = self.bar_height + self.bar_label_spacing
                     cr.translate(allocation.x + width, allocation.y + height)
                 else:
-                    height = self.bar_height + self.bar_label_spacing
                     cr.translate(
                         allocation.x + self.h_padding, allocation.y + height)
             else:
@@ -505,10 +489,7 @@ class SegmentedBar(Gtk.DrawingArea):
             self.title = ''
             if device.startswith('/'):
                 self.title = find_in_os_prober(device)
-            if self.title:
-                self.title = '%s (%s)' % (self.title, device)
-            else:
-                self.title = device
+            self.title = f'{self.title} ({device})' if self.title else device
             self.set_size(size)
             self.color = color
             self.show_in_bar = show_in_bar
@@ -517,17 +498,11 @@ class SegmentedBar(Gtk.DrawingArea):
             self.layout_height = 0
 
         def __eq__(self, obj):
-            if self.device == obj:
-                return True
-            else:
-                return False
+            return self.device == obj
 
         def set_size(self, size):
             self.size = size
-            if size > 0:
-                self.subtitle = format_size(self.size)
-            else:
-                self.subtitle = ''
+            self.subtitle = format_size(self.size) if size > 0 else ''
 
 
 GObject.type_register(SegmentedBar)

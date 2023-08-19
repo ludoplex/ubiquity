@@ -20,9 +20,8 @@ def get_distribution():
     """Returns the name of the running distribution."""
     with open('/cdrom/.disk/info') as f:
         for line in f:
-            distro = line[:max(line.find(' '), 0) or None]
-            if distro:
-                if distro == 'Linux Mint-GNOME' or distro == "Linux Mint-MATE":
+            if distro := line[: max(line.find(' '), 0) or None]:
+                if distro in ['Linux Mint-GNOME', "Linux Mint-MATE"]:
                     return str(distro.replace('-', ' '))
                 else:
                     return str(distro)
@@ -54,8 +53,9 @@ def generate_config():
         'and wi-fi hardware. Some of this software is proprietary. ' \
         'The software is subject to license terms included with its ' \
         'documentation.'.format(distro_flavor)
-    stepPrepare['prepare_download_updates'] = \
-        'Download updates while installing {}'.format(distro_flavor)
+    stepPrepare[
+        'prepare_download_updates'
+    ] = f'Download updates while installing {distro_flavor}'
     stepPrepare['prepare_nonfree_software'] = \
         'Install third-party software for graphics ' \
         'and Wi-Fi hardware and additional media formats'

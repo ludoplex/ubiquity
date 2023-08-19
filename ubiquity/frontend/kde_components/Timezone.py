@@ -31,7 +31,7 @@ class TimezoneMap(QtWidgets.QWidget):
 
         # load background pixmap
         self.imagePath = "/usr/share/ubiquity/pixmaps/timezone"
-        self.pixmap = QtGui.QPixmap("%s/bg.png" % self.imagePath)
+        self.pixmap = QtGui.QPixmap(f"{self.imagePath}/bg.png")
         self.setMinimumSize(self.pixmap.size() / 2)
         self.setMaximumSize(self.pixmap.size())
         policy = QtWidgets.QSizePolicy(
@@ -54,13 +54,10 @@ class TimezoneMap(QtWidgets.QWidget):
             '-8.0', '-9.0', '-9.5', '-10.0', '-11.0',
         ]
 
-        zonePixmaps = {}
-
-        for zone in zones:
-            # print('%s/timezone_%s.png' % (self.imagePath, zone))
-            zonePixmaps[zone] = QtGui.QPixmap(
-                '%s/timezone_%s.png' % (self.imagePath, zone))
-
+        zonePixmaps = {
+            zone: QtGui.QPixmap(f'{self.imagePath}/timezone_{zone}.png')
+            for zone in zones
+        }
         # load the timezones from database
         self.tzdb = ubiquity.tz.Database()
         for location in self.tzdb.locations:
@@ -116,10 +113,7 @@ class TimezoneMap(QtWidgets.QWidget):
         # Convert to a percentage.
         y = abs(y - 2.30341254338)  # 0 ... 4.606825
         y = y / 4.6068250867599998
-        # Adjust for the visible map not including anything beyond 60
-        # degrees south (150 degrees vs 180 degrees).
-        y = y * (self.height() * 1.2)
-        return y
+        return y * (self.height() * 1.2)
 
     def sizeHint(self):
         return self.pixmap.size()
@@ -267,8 +261,7 @@ class TimezoneMap(QtWidgets.QWidget):
 
     # internal set timezone based on a city
     def _set_timezone(self, loc, zone=None):
-        city = loc and self.cities[loc.zone]
-        if city:
+        if city := loc and self.cities[loc.zone]:
             self.selected_city = city
             self.selected_zone = zone or loc.zone
             self.zoneChanged.emit(loc, self.selected_zone)

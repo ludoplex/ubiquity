@@ -43,10 +43,7 @@ class WirelessPageBase(plugin.PluginUI):
 
         from ubiquity import nm
 
-        if nm.wireless_hardware_present():
-            return self.skip
-        else:
-            return True
+        return self.skip if nm.wireless_hardware_present() else True
 
 
 class PageGtk(WirelessPageBase):
@@ -118,14 +115,13 @@ class PageGtk(WirelessPageBase):
         if self.state == nm.NM_STATE_CONNECTING:
             frontend.translate_widget(frontend.next)
             self.next_normal = True
-        else:
-            if (not self.nmwidget.is_row_an_ap() or
+        elif (not self.nmwidget.is_row_an_ap() or
                     self.nmwidget.is_row_connected()):
-                frontend.translate_widget(frontend.next)
-                self.next_normal = True
-            else:
-                frontend.next.set_label(self.connect_text)
-                self.next_normal = False
+            frontend.translate_widget(frontend.next)
+            self.next_normal = True
+        else:
+            frontend.next.set_label(self.connect_text)
+            self.next_normal = False
 
     def wireless_toggled(self, unused):
         frontend = self.controller._wizard
@@ -178,7 +174,6 @@ class PageGtk(WirelessPageBase):
 
             frontend.translate_widget(frontend.back)
             self.back_normal = True
-            frontend.back.set_sensitive(True)
         else:
             frontend.status_spinner.show()
             frontend.status_spinner.start()
@@ -188,7 +183,7 @@ class PageGtk(WirelessPageBase):
 
             frontend.back.set_label(self.stop_text)
             self.back_normal = False
-            frontend.back.set_sensitive(True)
+        frontend.back.set_sensitive(True)
         self.selection_changed(None)
 
 
@@ -227,10 +222,10 @@ class PageKde(WirelessPageBase):
         self.page.use_wireless.toggled.connect(self._update_ui)
 
     def plugin_translate(self, lang):
-        dct = dict()
-        for text in self.nmwidget.get_translation_keys():
-            dct[text] = self.controller.get_string('ubiquity/text/' + text)
-
+        dct = {
+            text: self.controller.get_string(f'ubiquity/text/{text}')
+            for text in self.nmwidget.get_translation_keys()
+        }
         self.nmwidget.translate(dct)
 
     def _update_ui(self):

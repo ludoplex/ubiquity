@@ -78,15 +78,19 @@ class KeyboardDetector:
             elif line.startswith('YES '):
                 # Direct the evaluating code to process step ## next if the
                 # user does have this key.
-                if (step_type != KeyboardDetector.KEY_PRESENT_P and
-                        step_type != KeyboardDetector.KEY_PRESENT):
+                if step_type not in [
+                    KeyboardDetector.KEY_PRESENT_P,
+                    KeyboardDetector.KEY_PRESENT,
+                ]:
                     raise Exception
                 self.present = int(line[4:].strip())
             elif line.startswith('NO '):
                 # Direct the evaluating code to process step ## next if the
                 # user does not have this key.
-                if (step_type != KeyboardDetector.KEY_PRESENT_P and
-                        step_type != KeyboardDetector.KEY_PRESENT):
+                if step_type not in [
+                    KeyboardDetector.KEY_PRESENT_P,
+                    KeyboardDetector.KEY_PRESENT,
+                ]:
                     raise Exception
                 self.not_present = int(line[3:].strip())
             elif line.startswith('MAP '):

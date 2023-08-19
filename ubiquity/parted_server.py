@@ -80,7 +80,7 @@ class PartedServer(object):
             ret = [''] * count
             count -= 1
         pieces = line.split(None, count)
-        ret[0:len(pieces)] = pieces
+        ret[:len(pieces)] = pieces
         return ret
 
     def read_paragraph(self):
@@ -89,7 +89,7 @@ class PartedServer(object):
             line = self.read_line()[0]
             if line == '':
                 break
-            self.log('paragraph: %s' % line)
+            self.log(f'paragraph: {line}')
             paragraph += line
             paragraph += '\n'
         return paragraph
@@ -100,7 +100,7 @@ class PartedServer(object):
             item = self.read_line()[0]
             if item == '':
                 break
-            self.log('option: %s' % item)
+            self.log(f'option: {item}')
             ret.append(item)
         return ret
 
@@ -112,7 +112,7 @@ class PartedServer(object):
             exception_type = self.read_line()[0]
             if exception_type == 'OK':
                 break
-            self.log('error_handler: exception with type %s' % exception_type)
+            self.log(f'error_handler: exception with type {exception_type}')
             if exception_type == 'Timer':
                 while True:
                     (frac, state) = self.read_line(2)
@@ -123,9 +123,7 @@ class PartedServer(object):
                 message = self.read_paragraph()
                 self.log('error_handler: reading options')
                 options = self.read_list()
-                if exception_type in ('Information', 'Warning'):
-                    pass
-                else:
+                if exception_type not in ('Information', 'Warning'):
                     raise PartedServerError(exception_type, message, options)
 
     def sync_server(self):

@@ -55,7 +55,7 @@ class Partition:
             name = find_in_os_prober(path)
         if not name:
             name = path.replace('/dev/', '')
-        self.name = '%s (%s)' % (name, fs)
+        self.name = f'{name} ({fs})'
 
 
 class PartitionsBar(QtWidgets.QWidget):
@@ -149,10 +149,7 @@ class PartitionsBar(QtWidgets.QWidget):
         # label vertical location
         labelY = h + 8
 
-        texts = []
-        texts.append(part.name)
-        texts.append(format_size(part.size))
-
+        texts = [part.name, format_size(part.size)]
         nameFont = QtGui.QFont("arial", 10)
         infoFont = QtGui.QFont("arial", 8)
 
@@ -236,9 +233,7 @@ class PartitionsBar(QtWidgets.QWidget):
         if not part:
             return
 
-        if prefsize > maxsize:
-            prefsize = maxsize
-
+        prefsize = min(prefsize, maxsize)
         new_size = part.size - prefsize
         part.size = prefsize
         part.minsize = minsize
@@ -265,9 +260,9 @@ class PartitionsBar(QtWidgets.QWidget):
         self.setMouseTracking(True)
 
     def mousePressEvent(self, qMouseEvent):
-        if self.resize_part:
             # if pressed on bar
-            if abs(qMouseEvent.x() - self.resize_loc) < 3:
+        if abs(qMouseEvent.x() - self.resize_loc) < 3:
+            if self.resize_part:
                 self.resizing = True
 
     def mouseMoveEvent(self, qMouseEvent):
@@ -276,7 +271,8 @@ class PartitionsBar(QtWidgets.QWidget):
             for p in self.partitions:
                 if p == self.resize_part:
                     break
-                start += p.size
+                else:
+                    start += p.size
 
             ew = self.width() - 1
             bpp = self.diskSize / float(ew)
@@ -310,12 +306,12 @@ class PartitionsBar(QtWidgets.QWidget):
             # truncates to 32bit int
             self.partitionResized.emit(
                 self.resize_part.path, self.resize_part.size)
-        else:
+        elif abs(qMouseEvent.x() - self.resize_loc) < 3:
             if self.resize_part:
-                if abs(qMouseEvent.x() - self.resize_loc) < 3:
-                    self.setCursor(QtCore.Qt.SplitHCursor)
-                elif self.cursor != QtCore.Qt.ArrowCursor:
-                    self.setCursor(QtCore.Qt.ArrowCursor)
+                self.setCursor(QtCore.Qt.SplitHCursor)
+        elif self.cursor != QtCore.Qt.ArrowCursor:
+            if self.resize_part:
+                self.setCursor(QtCore.Qt.ArrowCursor)
 
     def mouseReleaseEvent(self, qMouseEvent):
         self.resizing = False

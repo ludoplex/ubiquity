@@ -111,10 +111,7 @@ class BaseFrontend:
 
         self.start_debconf()
 
-        self.oem_user_config = False
-        if 'UBIQUITY_OEM_USER_CONFIG' in os.environ:
-            self.oem_user_config = True
-
+        self.oem_user_config = 'UBIQUITY_OEM_USER_CONFIG' in os.environ
         try:
             self.custom_title = self.db.get('ubiquity/custom_title_text')
         except debconf.DebconfError:
@@ -151,7 +148,7 @@ class BaseFrontend:
 
         try:
             self.show_shutdown_button = \
-                self.db.get('ubiquity/show_shutdown_button') == 'true'
+                    self.db.get('ubiquity/show_shutdown_button') == 'true'
         except debconf.DebconfError:
             self.show_shutdown_button = False
 
@@ -178,13 +175,12 @@ class BaseFrontend:
 
         if 'SUDO_USER' in os.environ:
             os.environ['SCIM_USER'] = os.environ['SUDO_USER']
-            os.environ['SCIM_HOME'] = os.path.expanduser(
-                '~%s' % os.environ['SUDO_USER'])
+            os.environ['SCIM_HOME'] = os.path.expanduser(f"~{os.environ['SUDO_USER']}")
 
     def _abstract(self, method):
-        raise NotImplementedError("%s.%s does not implement %s" %
-                                  (self.__class__.__module__,
-                                   self.__class__.__name__, method))
+        raise NotImplementedError(
+            f"{self.__class__.__module__}.{self.__class__.__name__} does not implement {method}"
+        )
 
     def run(self):
         """Main entry point."""
@@ -259,22 +255,16 @@ class BaseFrontend:
             self.dbfilter_status = None
         else:
             name = dbfilter.__module__
-            if dbfilter.status:
-                self.dbfilter_status = (name, dbfilter.status)
-            else:
-                self.dbfilter_status = None
-        if self.dbfilter is None:
-            currentname = 'None'
-        else:
-            currentname = self.dbfilter.__module__
-        syslog.syslog(syslog.LOG_DEBUG,
-                      "debconffilter_done: %s (current: %s)" %
-                      (name, currentname))
-        if dbfilter == self.dbfilter:
-            self.dbfilter = None
-            return True
-        else:
+            self.dbfilter_status = (name, dbfilter.status) if dbfilter.status else None
+        currentname = 'None' if self.dbfilter is None else self.dbfilter.__module__
+        syslog.syslog(
+            syslog.LOG_DEBUG,
+            f"debconffilter_done: {name} (current: {currentname})",
+        )
+        if dbfilter != self.dbfilter:
             return False
+        self.dbfilter = None
+        return True
 
     def refresh(self):
         """Take the opportunity to process pending items in the event loop."""
@@ -386,10 +376,7 @@ class BaseFrontend:
                 'fget', 'ubiquity/reboot', 'seen')
         except debconf.DebconfError:
             pass
-        if reboot_seen == 'false':
-            return False
-        else:
-            return True
+        return reboot_seen != 'false'
 
     def set_shutdown(self, shutdown):
         """Set whether to shutdown automatically when the install completes."""
@@ -405,10 +392,7 @@ class BaseFrontend:
                 'fget', 'ubiquity/poweroff', 'seen')
         except debconf.DebconfError:
             pass
-        if shutdown_seen == 'false':
-            return False
-        else:
-            return True
+        return shutdown_seen != 'false'
 
     # General facilities for components.
 
@@ -462,16 +446,15 @@ class BaseFrontend:
         self.wget_retcode = self.wget_proc.poll()
         if self.wget_retcode is None:
             return True
-        else:
-            state = False
-            if self.wget_retcode == 0:
-                h = md5()
-                h.update(self.wget_proc.stdout.read())
-                if WGET_HASH == h.hexdigest():
-                    state = True
-            self.wget_proc.stdout.close()
-            self.set_online_state(state)
-            return False
+        state = False
+        if self.wget_retcode == 0:
+            h = md5()
+            h.update(self.wget_proc.stdout.read())
+            if WGET_HASH == h.hexdigest():
+                state = True
+        self.wget_proc.stdout.close()
+        self.set_online_state(state)
+        return False
 
     def set_online_state(self, state):
         pass

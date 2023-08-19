@@ -63,19 +63,17 @@ class Install(FilteredCommand):
         if question == 'hw-detect/modprobe_error':
             # don't need to display this, and it's non-fatal
             return True
-        elif question == 'apt-setup/security-updates-failed':
-            fatal = False
-        elif (question == 'ubiquity/install/broken_active_directory' or
-              question == 'ubiquity/install/broken_luks_add_key'):
+        elif question in [
+            'apt-setup/security-updates-failed',
+            'ubiquity/install/broken_active_directory',
+            'ubiquity/install/broken_luks_add_key',
+        ]:
             fatal = False
         else:
             fatal = True
         self.frontend.error_dialog(self.description(question),
                                    self.extended_description(question), fatal)
-        if fatal:
-            return FilteredCommand.error(self, priority, question)
-        else:
-            return True
+        return FilteredCommand.error(self, priority, question) if fatal else True
 
     def run(self, priority, question):
         if question.endswith('/apt-install-failed'):

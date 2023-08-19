@@ -36,7 +36,7 @@ def get_prop(obj, iface, prop):
 def get_vendor_and_model(udi):
     vendor = ''
     model = ''
-    cmd = ['udevadm', 'info', '--path=%s' % udi, '--query=property']
+    cmd = ['udevadm', 'info', f'--path={udi}', '--query=property']
     with open('/dev/null', 'w') as devnull:
         out = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=devnull,
@@ -149,8 +149,7 @@ class NetworkManager:
         if not connectedap:
             return False
         connect_obj = self.bus.get_object(NM, connectedap)
-        ssid = get_prop(connect_obj, NM_AP, 'Ssid')
-        if ssid:
+        if ssid := get_prop(connect_obj, NM_AP, 'Ssid'):
             return ap == decode_ssid(ssid)
         else:
             return False
@@ -162,8 +161,7 @@ class NetworkManager:
         saved_path = ''
         for ap_path in ap_list:
             ap_obj = self.bus.get_object(NM, ap_path)
-            ssid = get_prop(ap_obj, NM_AP, 'Ssid')
-            if ssid:
+            if ssid := get_prop(ap_obj, NM_AP, 'Ssid'):
                 strength = get_prop(ap_obj, NM_AP, 'Strength')
                 if decode_ssid(ssid) == ap and saved_strength < strength:
                     # Connect to the strongest AP.
@@ -216,8 +214,7 @@ class NetworkManager:
     def properties_changed(self, props, path=None):
         if 'Strength' in props:
             ap_obj = self.bus.get_object(NM, path)
-            ssid = get_prop(ap_obj, NM_AP, 'Ssid')
-            if ssid:
+            if ssid := get_prop(ap_obj, NM_AP, 'Ssid'):
                 ssid = decode_ssid(ssid)
                 strength = int(props['Strength'])
                 for devid in self.model.get_device_ids():
@@ -232,8 +229,7 @@ class NetworkManager:
             if device_type_prop != DEVICE_TYPE_WIFI:
                 continue
             if not self.model.has_device(device_path):
-                udi = get_prop(device_obj, NM_DEVICE, 'Udi')
-                if udi:
+                if udi := get_prop(device_obj, NM_DEVICE, 'Udi'):
                     vendor, model = get_vendor_and_model(udi)
                 else:
                     vendor, model = ('', '')
@@ -242,8 +238,7 @@ class NetworkManager:
             ssids = []
             for ap_path in ap_list:
                 ap_obj = self.bus.get_object(NM, ap_path)
-                ssid = get_prop(ap_obj, NM_AP, 'Ssid')
-                if ssid:
+                if ssid := get_prop(ap_obj, NM_AP, 'Ssid'):
                     ssid = decode_ssid(ssid)
                     strength = int(get_prop(ap_obj, NM_AP, 'Strength') or 0)
                     secure = (get_prop(ap_obj, NM_AP, 'WpaFlags') != 0 or

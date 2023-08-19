@@ -246,14 +246,13 @@ class PartitionBox(Gtk.Alignment):
 
     def do_set_property(self, prop, value):
         if prop.name == 'title':
-            self.ostitle.set_markup('<b>%s</b>' % value)
+            self.ostitle.set_markup(f'<b>{value}</b>')
             return
         elif prop.name == 'icon-name':
             self.logo.set_from_icon_name(value, Gtk.IconSize.DIALOG)
             return
         elif prop.name == 'extra':
-            self.extra.set_markup('<small>%s</small>' %
-                                  (value and value or ' '))
+            self.extra.set_markup(f"<small>{value and value or ' '}</small>")
             return
         setattr(self, prop.name, value)
 
@@ -295,14 +294,14 @@ class PartitionBox(Gtk.Alignment):
         vbox.pack_start(align, False, True, 0)
         self.add(vbox)
 
-        self.ostitle.set_markup('<b>%s</b>' % title)
+        self.ostitle.set_markup(f'<b>{title}</b>')
         # Take up the space that would otherwise be used to create symmetry.
-        self.extra.set_markup('<small>%s</small>' % extra and extra or ' ')
+        self.extra.set_markup(f'<small>{extra}</small>' and extra or ' ')
         self.show_all()
 
     def set_size(self, size):
         size = misc.format_size(size)
-        self.size.set_markup('<span size="x-large">%s</span>' % size)
+        self.size.set_markup(f'<span size="x-large">{size}</span>')
 
 
 GObject.type_register(PartitionBox)

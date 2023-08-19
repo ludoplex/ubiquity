@@ -59,11 +59,8 @@ class PartMan(QtWidgets.QWidget):
 
         self.active_bar = None
         partition_bar = None
-        indexCount = -1
-        for item in cache_order:
+        for indexCount, item in enumerate(cache_order, start=-1):
             if item in disk_cache:
-                # the item is a disk
-                indexCount += 1
                 partition_bar = PartitionsBar(
                     self.part_advanced_bar_frame,
                     controller=self.ctrlr)
@@ -84,8 +81,6 @@ class PartMan(QtWidgets.QWidget):
                 # add the new partition to our tree display
                 self.partition_tree_model.append(
                     [item, partition, partition_bar], self.ctrlr)
-                indexCount += 1
-
                 # data for bar display
                 size = int(partition['parted']['size'])
                 fs = partition['parted']['fs']
@@ -106,8 +101,7 @@ class PartMan(QtWidgets.QWidget):
         if self.active_bar:
             self.active_bar.setVisible(False)
 
-        indexes = self.partition_list_treeview.selectedIndexes()
-        if indexes:
+        if indexes := self.partition_list_treeview.selectedIndexes():
             index = indexes[0]
 
             item = index.internalPointer()
@@ -145,7 +139,7 @@ class PartMan(QtWidgets.QWidget):
         if not dialog:
             self.create_dialog = QtWidgets.QDialog(self)
             dialog = self.create_dialog
-            uic.loadUi("%s/partition_create_dialog.ui" % _uidir, dialog)
+            uic.loadUi(f"{_uidir}/partition_create_dialog.ui", dialog)
             dialog.partition_create_use_combo.currentIndexChanged[int].connect(
                 self.on_partition_create_use_combo_changed)
 
@@ -199,15 +193,23 @@ class PartMan(QtWidgets.QWidget):
         dialog.partition_create_mount_combo.clearEditText()
 
         if dialog.exec_() == QtWidgets.QDialog.Accepted:
-            if partition['parted']['type'] == 'primary':
+            if (
+                partition['parted']['type'] != 'primary'
+                and partition['parted']['type'] != 'logical'
+                and partition['parted']['type'] == 'pri/log'
+                and dialog.partition_create_type_primary.isChecked()
+                or partition['parted']['type'] == 'primary'
+            ):
                 prilog = PARTITION_TYPE_PRIMARY
-            elif partition['parted']['type'] == 'logical':
+            elif (
+                partition['parted']['type'] != 'primary'
+                and partition['parted']['type'] != 'logical'
+                and partition['parted']['type'] == 'pri/log'
+                and not dialog.partition_create_type_primary.isChecked()
+                or partition['parted']['type'] != 'primary'
+                and partition['parted']['type'] == 'logical'
+            ):
                 prilog = PARTITION_TYPE_LOGICAL
-            elif partition['parted']['type'] == 'pri/log':
-                if dialog.partition_create_type_primary.isChecked():
-                    prilog = PARTITION_TYPE_PRIMARY
-                else:
-                    prilog = PARTITION_TYPE_LOGICAL
 
             if dialog.partition_create_place_beginning.isChecked():
                 place = PARTITION_PLACE_BEGINNING
@@ -256,7 +258,7 @@ class PartMan(QtWidgets.QWidget):
         if not dialog:
             self.edit_dialog = QtWidgets.QDialog(self)
             dialog = self.edit_dialog
-            uic.loadUi("%s/partition_edit_dialog.ui" % _uidir, dialog)
+            uic.loadUi(f"{_uidir}/partition_edit_dialog.ui", dialog)
             dialog.partition_edit_use_combo.currentIndexChanged[int].connect(
                 self.on_partition_edit_use_combo_changed)
 

@@ -45,8 +45,7 @@ def load_plugins():
         try:
             modules.append(load_plugin(modname))
         except Exception as e:
-            print('Could not import plugin %s: %s' % (modname, e),
-                  file=sys.stderr)
+            print(f'Could not import plugin {modname}: {e}', file=sys.stderr)
     return modules
 
 
@@ -61,36 +60,22 @@ def get_mod_list(mod, name):
 
 
 def get_mod_string(mod, name):
-    if hasattr(mod, name):
-        mod_string = getattr(mod, name)
-        return mod_string
-    else:
-        return ''
+    return getattr(mod, name) if hasattr(mod, name) else ''
 
 
 def get_mod_int(mod, name):
-    if hasattr(mod, name):
-        mod_int = getattr(mod, name)
-        return mod_int
-    else:
-        return 0
+    return getattr(mod, name) if hasattr(mod, name) else 0
 
 
 def get_mod_bool(mod, name):
-    if hasattr(mod, name):
-        mod_bool = getattr(mod, name)
-        return mod_bool
-    else:
-        return True
+    return getattr(mod, name) if hasattr(mod, name) else True
 
 
 def get_mod_index(modlist, name):
-    index = 0
-    for mod in modlist:
+    for index, mod in enumerate(modlist):
         modname = get_mod_string(mod, 'NAME')
         if modname == name:
             return index
-        index += 1
     return None
 
 
@@ -103,24 +88,22 @@ def determine_mod_index(after, before, order):
     for modname in after:
         if not modname:
             return 0
-        else:
-            index = get_mod_index(order, modname)
-            if index is not None:
-                return index + 1
+        index = get_mod_index(order, modname)
+        if index is not None:
+            return index + 1
     if index is None:
         for modname in before:
             if not modname:
                 return len(order)
-            else:
-                index = get_mod_index(order, modname)
-                if index is not None:
-                    return index
+            index = get_mod_index(order, modname)
+            if index is not None:
+                return index
     return None
 
 
 # Strips one module from the 'mods' list and inserts it into 'order'
 def one_pass(mods, order, hidden_list):
-    mods_copy = [x for x in mods]
+    mods_copy = list(mods)
     for mod in mods_copy:
         name = get_mod_string(mod, 'NAME')
         if not name:

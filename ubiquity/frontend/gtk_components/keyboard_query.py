@@ -8,7 +8,7 @@ class Keyrow(Gtk.Box):
         GObject.GObject.__init__(self, spacing=24)
 
     def add_character(self, key):
-        ret = Gtk.Label(label='<big>%s</big>' % key)
+        ret = Gtk.Label(label=f'<big>{key}</big>')
         ret.set_use_markup(True)
         self.pack_start(ret, True, True, 0)
         ret.show()
@@ -83,8 +83,10 @@ class KeyboardQuery(Gtk.Window):
         if r == keyboard_detector.KeyboardDetector.PRESS_KEY:
             self.heading.set_label(self.press_string)
             self.buttons.hide()
-        elif (r == keyboard_detector.KeyboardDetector.KEY_PRESENT or
-              r == keyboard_detector.KeyboardDetector.KEY_PRESENT_P):
+        elif r in [
+            keyboard_detector.KeyboardDetector.KEY_PRESENT,
+            keyboard_detector.KeyboardDetector.KEY_PRESENT_P,
+        ]:
             self.heading.set_label(self.present_string)
             self.buttons.show()
         elif r == keyboard_detector.KeyboardDetector.RESULT:

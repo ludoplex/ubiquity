@@ -82,9 +82,9 @@ def read_config():
     # lines. We avoid these since that would involve starting up scim even
     # for English, which is going a bit far.
     if 'HOME' in os.environ:
-        files.append('%s/.xinput.d/%s' % (os.environ['HOME'], lang))
-        # files.append('%s/.xinput.d/all_ALL' % os.environ['HOME'])
-    files.append('/etc/X11/xinit/xinput.d/%s' % lang)
+        files.append(f"{os.environ['HOME']}/.xinput.d/{lang}")
+            # files.append('%s/.xinput.d/all_ALL' % os.environ['HOME'])
+    files.append(f'/etc/X11/xinit/xinput.d/{lang}')
     # files.append('/etc/X11/xinit/xinput.d/all_ALL')
     # files.append('/etc/X11/xinit/xinput.d/default')
 
@@ -120,7 +120,7 @@ def start_im():
         return (var in cfg and cfg[var])
 
     if not cfg_has('XMODIFIERS') and cfg_has('XIM'):
-        cfg['XMODIFIERS'] = '@im=%s' % cfg['XIM']
+        cfg['XMODIFIERS'] = f"@im={cfg['XIM']}"
 
     for var in ('GTK_IM_MODULE', 'QT_IM_MODULE', 'XMODIFIERS'):
         if cfg_has(var):
@@ -148,7 +148,7 @@ def start_im():
             if program in ('scim', 'skim') and '-d' in cfg['XIM_ARGS']:
                 import re
                 cfg['XIM_ARGS'] = re.sub(r'-d', '', cfg['XIM_ARGS'])
-            args = ' %s' % cfg['XIM_ARGS']
+            args = f" {cfg['XIM_ARGS']}"
         else:
             args = ''
         args = shlex.split(args)

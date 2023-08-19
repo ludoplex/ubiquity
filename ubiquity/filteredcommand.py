@@ -42,10 +42,7 @@ DEBCONF_IO_HUP = 8
 class UntrustedBase(object):
     def get(self, attr):
         '''Safely gets an attribute.  If it doesn't exist, returns None'''
-        if hasattr(self, attr):
-            return getattr(self, attr)
-        else:
-            return None
+        return getattr(self, attr) if hasattr(self, attr) else None
 
     def call(self, method, *args, **kwargs):
         '''Safely calls a member.  If it doesn't exist, returns None'''
@@ -55,7 +52,7 @@ class UntrustedBase(object):
             return None
 
     @classmethod
-    def debug_enabled(*args):
+    def debug_enabled(cls):
         return ('UBIQUITY_DEBUG_CORE' in os.environ and
                 os.environ['UBIQUITY_DEBUG_CORE'] == '1')
 
@@ -66,7 +63,7 @@ class UntrustedBase(object):
             # bizarre time formatting code per syslogd
             time_str = time.ctime()[4:19]
             message = fmt % args
-            print('%s %s: %s' % (time_str, PACKAGE, message), file=sys.stderr)
+            print(f'{time_str} {PACKAGE}: {message}', file=sys.stderr)
 
     @property
     def is_automatic(self):
@@ -108,19 +105,13 @@ class FilteredCommand(UntrustedBase):
         else:
             self.command.extend(prep[0])
         question_patterns = prep[1]
-        if len(prep) > 2:
-            env = prep[2]
-        else:
-            env = {}
-
+        env = prep[2] if len(prep) > 2 else {}
         self.debug("Starting up '%s' for %s.%s", self.command,
                    self.__class__.__module__, self.__class__.__name__)
         self.debug("Watching for question patterns %s",
                    ', '.join(question_patterns))
 
-        widgets = {}
-        for pattern in question_patterns:
-            widgets[pattern] = self
+        widgets = {pattern: self for pattern in question_patterns}
         self.dbfilter = DebconfFilter(self.db, widgets, self.is_automatic)
 
         # TODO: Set as unseen all questions that we're going to ask.
@@ -177,11 +168,7 @@ class FilteredCommand(UntrustedBase):
                 self.command.extend(prep[0])
             self.debug("Starting up '%s' for %s.%s", self.command,
                        self.__class__.__module__, self.__class__.__name__)
-            if len(prep) > 2:
-                env = prep[2]
-            else:
-                env = {}
-
+            env = prep[2] if len(prep) > 2 else {}
             def subprocess_setup():
                 for key, value in env.items():
                     os.environ[key] = value
@@ -215,11 +202,7 @@ class FilteredCommand(UntrustedBase):
 
         prep = self.prepare(unfiltered=True)
         self.command = prep[0]
-        if len(prep) > 2:
-            env = prep[2]
-        else:
-            env = {}
-
+        env = prep[2] if len(prep) > 2 else {}
         self.debug("Starting up '%s' unfiltered for %s.%s", self.command,
                    self.__class__.__module__, self.__class__.__name__)
 
@@ -279,7 +262,7 @@ class FilteredCommand(UntrustedBase):
 
         while index < textlen:
             if text[index] == '\\' and index + 1 < textlen:
-                if text[index + 1] == ',' or text[index + 1] == ' ':
+                if text[index + 1] in [',', ' ']:
                     item += text[index + 1]
                     index += 1
             elif text[index] == ',':
@@ -311,12 +294,9 @@ class FilteredCommand(UntrustedBase):
         without duplication.
         """
 
-        _map = {}
         choices = self.choices(question)
         choices_c = self.choices_untranslated(question)
-        for i in range(len(choices)):
-            _map[choices[i]] = choices_c[i]
-        return _map
+        return {choices[i]: choices_c[i] for i in range(len(choices))}
 
     def description(self, question):
         return misc.utf8(self.db.metaget(question, 'description'),

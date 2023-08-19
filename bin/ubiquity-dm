@@ -27,7 +27,7 @@ logfile = None
 
 
 def log(msg):
-    print('ubiquity-dm: ' + msg, file=logfile, flush=True)
+    print(f'ubiquity-dm: {msg}', file=logfile, flush=True)
 
 
 def _pam_conv(auth, query_list, userData):
@@ -60,7 +60,7 @@ def set_locale():
         return
 
     with open('/etc/default/locale', 'w') as default_locale:
-        print('LANG="%s"' % locale, file=default_locale)
+        print(f'LANG="{locale}"', file=default_locale)
 
     with open('/etc/environment') as environment:
         environment_lines = environment.readlines()
@@ -68,15 +68,15 @@ def set_locale():
         seen_lang = False
         for line in environment_lines:
             if line.startswith('LANG='):
-                print('LANG="%s"' % locale, file=environment)
+                print(f'LANG="{locale}"', file=environment)
                 seen_lang = True
             else:
                 print(line.rstrip('\n'), file=environment)
         if not seen_lang:
-            print('LANG="%s"' % locale, file=environment)
+            print(f'LANG="{locale}"', file=environment)
 
     with open('/etc/locale.gen', 'w') as locale_gen:
-        print('%s UTF-8' % locale, file=locale_gen)
+        print(f'{locale} UTF-8', file=locale_gen)
 
     subprocess.call(['/usr/sbin/locale-gen', locale],
                     stdout=logfile, stderr=logfile)
@@ -161,13 +161,12 @@ class DM:
             self.uid, self.gid = pwd.getpwnam(self.username)[2:4]
         except KeyError:
             import syslog
-            syslog.syslog('Could not find %s, falling back to root.' %
-                          self.username)
+            syslog.syslog(f'Could not find {self.username}, falling back to root.')
             self.username = 'root'
             self.uid, self.gid = 0, 0
         self.homedir = pwd.getpwnam(self.username)[5]
-        self.uid = int(self.uid)
-        self.gid = int(self.gid)
+        self.uid = self.uid
+        self.gid = self.gid
         self.groups = []
         for g in grp.getgrall():
             if self.username in g[3] or g[0] == self.username:
@@ -181,12 +180,13 @@ class DM:
         frontend_names = ['gtk_ui', 'kde_ui']
         self.frontend = None
         for f in frontend_names:
-            if util.find_spec('ubiquity.frontend.%s' % f) is not None:
+            if util.find_spec(f'ubiquity.frontend.{f}') is not None:
                 self.frontend = f
                 break
         if self.frontend is None:
-            raise AttributeError('No frontend available; tried %s' %
-                                 ', '.join(frontend_names))
+            raise AttributeError(
+                f"No frontend available; tried {', '.join(frontend_names)}"
+            )
 
         db = DebconfCommunicator('ubiquity', cloexec=True)
         try:
@@ -247,11 +247,10 @@ class DM:
         # arg or as determined by active_vt()
         #
         # self.vt is of the form str("vt10")
-        self.auth.putenv('XDG_VTNR=%s' % self.vt[2:])
+        self.auth.putenv(f'XDG_VTNR={self.vt[2:]}')
         self.auth.authenticate()
         self.auth.open_session()
-        os.environ.update(
-            [i.split('=', 1) for i in self.auth.getenvlist()])
+        os.environ |= [i.split('=', 1) for i in self.auth.getenvlist()]
 
     def pam_close_session(self):
         if self.auth:
