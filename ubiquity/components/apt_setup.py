@@ -32,27 +32,28 @@ class AptSetup(FilteredCommand):
         if host == '':
             return None
         port = str(gsettings.get('org.gnome.system.proxy.http', 'port'))
-        if port == '':
+        if not port:
             port = '8080'
 
         if not host.startswith("http://"):
-            host = "http://%s" % host
+            host = f"http://{host}"
 
-        auth = gsettings.get(
-            'org.gnome.system.proxy.http', 'use-authentication')
-        if auth:
-            user = gsettings.get(
-                'org.gnome.system.proxy.http', 'authentication-user')
-            password = gsettings.get(
-                'org.gnome.system.proxy.http', 'authentication-password')
-            return '%s:%s@%s:%s/' % (host, port, user, password)
-        else:
-            return '%s:%s/' % (host, port)
+        if not (
+            auth := gsettings.get(
+                'org.gnome.system.proxy.http', 'use-authentication'
+            )
+        ):
+            return f'{host}:{port}/'
+        user = gsettings.get(
+            'org.gnome.system.proxy.http', 'authentication-user')
+        password = gsettings.get(
+            'org.gnome.system.proxy.http', 'authentication-password')
+        return f'{host}:{port}@{user}:{password}/'
 
     def _gsettings_no_proxy(self):
-        ignore_list = gsettings.get_list(
-            'org.gnome.system.proxy', 'ignore-hosts')
-        if ignore_list:
+        if ignore_list := gsettings.get_list(
+            'org.gnome.system.proxy', 'ignore-hosts'
+        ):
             return ','.join(gsettings.get_list(
                 'org.gnome.system.proxy', 'ignore-hosts'))
 
@@ -68,8 +69,7 @@ class AptSetup(FilteredCommand):
             http_proxy = self._gsettings_http_proxy()
             if http_proxy is not None:
                 self.preseed('mirror/http/proxy', http_proxy)
-                no_proxy = self._gsettings_no_proxy()
-                if no_proxy:
+                if no_proxy := self._gsettings_no_proxy():
                     env['no_proxy'] = no_proxy
 
         return (['/usr/share/ubiquity/apt-setup'], ['PROGRESS'], env)

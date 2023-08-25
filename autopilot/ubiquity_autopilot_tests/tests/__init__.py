@@ -196,8 +196,7 @@ class UbiquityAutopilotTestCase(UbiquityTestCase):
         # first lets check all the items are non-empty unicode strings
         logger.debug("Checking all tree items are valid unicode")
         for item in treeview_items:
-            logger.debug("Check tree item with name '%s' is unicode" %
-                         item.accessible_name)
+            logger.debug(f"Check tree item with name '{item.accessible_name}' is unicode")
             self.expectIsInstance(item.accessible_name, str,
                                   "[Page:'stepLanguage'] Expected '%s' tree "
                                   "view item to be unicode but it wasn't" %
@@ -311,7 +310,6 @@ class UbiquityAutopilotTestCase(UbiquityTestCase):
         env = None
         if unity:
             logger.debug('Using default Unity env...')
-            pass
         elif gnome:
             logger.debug("Using gnome fallback env")
             env = 'fallback_install'
@@ -557,8 +555,8 @@ class UbiquityAutopilotTestCase(UbiquityTestCase):
 
         # now lets test typing with the keyboard layout
         entry = keyboard_page.select_single('GtkEntry')
+        text = u'Testing keyboard layout'
         while True:
-            text = u'Testing keyboard layout'
             with self.keyboard.focused_type(entry) as kb:
                 kb.type(text)
                 # check entry value is same length as text
@@ -757,8 +755,6 @@ class UbiquityAutopilotTestCase(UbiquityTestCase):
                 time.sleep(3)
             elif progress < 0.85:
                 time.sleep(1)
-            else:
-                pass
 
             # logger.debug('Percentage complete "{0:.0f}%"'
             #             .format(progress * 100))
@@ -781,9 +777,7 @@ class UbiquityAutopilotTestCase(UbiquityTestCase):
         # Try grab dialogs created at runtime
         unknown_dialogs = self.app.select_many('GtkDialog')
         for dlg in unknown_dialogs:
-            if dlg.name in dialogs or safe_dialogs:
-                pass
-            else:
+            if dlg.name not in dialogs and not safe_dialogs:
                 if dlg.visible:
                     msg = self._get_dialog_message(dlg)
                     # each dialog will display a label explaining the error
@@ -809,13 +803,11 @@ class UbiquityAutopilotTestCase(UbiquityTestCase):
 
     def _get_dialog_message(self, dlg_object):
         dialog_labels = dlg_object.select_many(GtkLabel)
-        message = ''
-        for gtklabel in dialog_labels:
-            # only add labels longer than 'Continue' so we avoid button labels
-            if len(gtklabel.label) > 8:
-                message += (gtklabel.label + '. ')
-
-        return message
+        return ''.join(
+            f'{gtklabel.label}. '
+            for gtklabel in dialog_labels
+            if len(gtklabel.label) > 8
+        )
 
     def _add_new_partition(self, ):
         """ adds a new partition """
@@ -929,7 +921,7 @@ class UbiquityAutopilotTestCase(UbiquityTestCase):
         self.assertThat(skp_button.visible, Equals(skip_button))
 
     def _update_current_step(self, name):
-        logger.debug("Updating current step to %s" % name)
+        logger.debug(f"Updating current step to {name}")
         self.step_before = self.current_step
         self.current_step = name
         # Lets print current step
@@ -1019,8 +1011,7 @@ class UbiquityAutopilotTestCase(UbiquityTestCase):
         logger.debug("Detecting flavor")
         with open('/cdrom/.disk/info') as f:
             for line in f:
-                distro = line[:max(line.find(' '), 0) or None]
-                if distro:
+                if distro := line[: max(line.find(' '), 0) or None]:
                     logger.debug("{0} flavor detected".format(distro))
                     return str(distro)
                 raise SystemError("Could not get distro name")

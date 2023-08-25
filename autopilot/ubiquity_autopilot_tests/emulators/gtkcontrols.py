@@ -108,10 +108,7 @@ class GtkToggleButton(AutopilotGtkEmulatorBase):
         to change after being clicked
 
         """
-        # get current state
-        new_val = 0
-        if self.active == 0:
-            new_val = 1
+        new_val = 1 if self.active == 0 else 0
         logger.debug('Objects current state is "{0}", '
                      'the state after clicking should be "{1}"'
                      .format(self.active, new_val))
@@ -291,9 +288,7 @@ class GtkTreeView(AutopilotGtkEmulatorBase):
         for column in tree_column_objects:
             # We are only interested in columns with headers. Blank columns
             # seem to usually be used for spacing and contain no cells
-            if column.accessible_name == '':
-                pass
-            else:
+            if column.accessible_name != '':
                 # strip all non alpaha chars
                 name = re.sub(r'\W+', '', column.accessible_name)
                 column_names.append(name)
@@ -302,24 +297,20 @@ class GtkTreeView(AutopilotGtkEmulatorBase):
         Columns = namedtuple('Columns', column_names)
         # generate a list of items
         tree_items = treeview.get_all_items()
-        # lets create a temp list
-        temp_list = []
-        # TODO: we actually don't really need this
-        for item in tree_items:
-            temp_list.append(item)
+        temp_list = list(tree_items)
         # so we want to create a Columns tuple for each row in the table
         # therefore picking only the n items where n is the number of column
         # names
         start, end = 0, len(column_names)
         row_list, table_dict = [], {}
-        for i in range(0, int(len(temp_list) / len(column_names))):
+        for i in range(0, len(temp_list) // len(column_names)):
             # fill columns tuple
             row = Columns(*temp_list[start:end])
             # create a new tuple adding the current row number
             # which we will use as dict key
             row_list.append(('Row{0}'.format(i + 1), row))
             # update our table dict
-            table_dict.update(row_list)
+            table_dict |= row_list
             # remove the items we just added from the temp list
             del temp_list[start:end]
         # return table_dict
@@ -366,20 +357,10 @@ class GtkTreeView(AutopilotGtkEmulatorBase):
             if "globalRect" not in tree.get_properties():
                 logger.debug("TreeView doesn't have globalRect property")
                 continue
-            # assume every treeview is in range unless we find out otherwise
-            in_range = True
-            i = 0
-            # Get a list of all ATK treeviews with globalRect within a
-            # 5px range of this GtkTreeView
-            # FIXME: is 5px too much?? It's unlikely more than one tree will
-            # be within this range anyway, as they would be overlaying each
-            # other.
-            # Even if they are only one will be visible (we hope!)
-            for r in self.globalRect:
-                if r not in range(tree.globalRect[i] - 5,
-                                  tree.globalRect[i] + 5):
-                    in_range = False
-                i += 1
+            in_range = all(
+                r in range(tree.globalRect[i] - 5, tree.globalRect[i] + 5)
+                for i, r in enumerate(self.globalRect)
+            )
             if in_range:
                 treeviews.append(tree)
         return treeviews
@@ -426,7 +407,7 @@ class GtkComboBox(AutopilotGtkEmulatorBase):
 
         # XXX: we should probably check the item is in the combo before
         # cycling through.
-        for item in items:
+        for _ in items:
             if labelText == combo.accessible_name:
                 logger.debug('Item is now selected')
                 return

@@ -10,7 +10,7 @@ from PyQt5.QtGui import QImage
 def main():
     for src in glob.glob("*_ltr.png"):
         dst = src.replace("ltr", "rtl")
-        print("%s => %s" % (src, dst))
+        print(f"{src} => {dst}")
         img = QImage(src)
         img.mirrored(True, False).save(dst)
 

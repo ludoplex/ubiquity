@@ -206,10 +206,7 @@ class PageGtk(plugin.PluginUI):
     def get_keyboard(self):
         selection = self.keyboardlayoutview.get_selection()
         (model, iterator) = selection.get_selected()
-        if iterator is None:
-            return None
-        else:
-            return misc.utf8(model.get_value(iterator, 0))
+        return None if iterator is None else misc.utf8(model.get_value(iterator, 0))
 
     def set_keyboard_variant_choices(self, choices):
         from gi.repository import Gtk, GObject
@@ -244,10 +241,7 @@ class PageGtk(plugin.PluginUI):
     def get_keyboard_variant(self):
         selection = self.keyboardvariantview.get_selection()
         (model, iterator) = selection.get_selected()
-        if iterator is None:
-            return None
-        else:
-            return misc.utf8(model.get_value(iterator, 0))
+        return None if iterator is None else misc.utf8(model.get_value(iterator, 0))
 
 
 class PageKde(plugin.PluginUI):
@@ -445,10 +439,10 @@ class Page(plugin.Plugin):
         di_locale = self.db.get('debian-installer/locale')
         ret = di_locale.rsplit('.', 1)[0]
         if not keyboard_names.has_language(ret):
-            self.debug("No keyboard layout translations for locale '%s'" % ret)
+            self.debug(f"No keyboard layout translations for locale '{ret}'")
             ret = ret.rsplit('_', 1)[0]
         if not keyboard_names.has_language(ret):
-            self.debug("No keyboard layout translations for locale '%s'" % ret)
+            self.debug(f"No keyboard layout translations for locale '{ret}'")
             # TODO should this be C.UTF-8?!
             ret = 'C'
         self._locale = ret
@@ -513,13 +507,12 @@ class Page(plugin.Plugin):
             if question == 'keyboard-configuration/altgr':
                 if self.has_variants:
                     return True
-                else:
-                    # If there's only one variant, it is always the same as
-                    # the layout name.
-                    single_variant = misc.utf8(self.db.get(
-                        'keyboard-configuration/layout'))
-                    self.ui.set_keyboard_variant_choices([single_variant])
-                    self.ui.set_keyboard_variant(single_variant)
+                # If there's only one variant, it is always the same as
+                # the layout name.
+                single_variant = misc.utf8(self.db.get(
+                    'keyboard-configuration/layout'))
+                self.ui.set_keyboard_variant_choices([single_variant])
+                self.ui.set_keyboard_variant(single_variant)
             else:
                 # TODO cjwatson 2006-10-02: no keyboard-configuration
                 # support for variant choice translation yet
@@ -595,7 +588,7 @@ class Page(plugin.Plugin):
                       'mv', 'mal', 'ori', 'pk', 'ru', 'scc', 'sy', 'syr',
                       'tel', 'th', 'tj', 'tam', 'ua', 'uz'):
             latin = False
-            real_layout = 'us,%s' % layout
+            real_layout = f'us,{layout}'
         elif layout == 'jp':
             if variant in ('106', 'common', 'OADG109A', 'nicola_f_bs', ''):
                 latin = True
@@ -627,28 +620,25 @@ class Page(plugin.Plugin):
         if latin:
             real_variant = variant
         elif real_layout == 'jp,jp':
-            real_variant = '106,%s' % variant
+            real_variant = f'106,{variant}'
         elif real_layout == 'lt,lt':
-            if variant == 'us':
-                real_variant = 'us,'
-            else:
-                real_variant = '%s,us' % variant
+            real_variant = 'us,' if variant == 'us' else f'{variant},us'
         elif real_layout == 'me,me':
-            if variant == 'cyrillicyz':
-                real_variant = 'latinyz,%s' % variant
-            elif variant == 'cyrillicalternatequotes':
-                real_variant = 'latinalternatequotes,%s' % variant
+            if variant == 'cyrillicalternatequotes':
+                real_variant = f'latinalternatequotes,{variant}'
+            elif variant == 'cyrillicyz':
+                real_variant = f'latinyz,{variant}'
             else:
-                real_variant = 'basic,%s' % variant
+                real_variant = f'basic,{variant}'
         elif real_layout == 'rs,rs':
-            if variant == 'yz':
-                real_variant = 'latinyz,%s' % variant
-            elif variant == 'alternatequotes':
-                real_variant = 'latinalternatequotes,%s' % variant
+            if variant == 'alternatequotes':
+                real_variant = f'latinalternatequotes,{variant}'
+            elif variant == 'yz':
+                real_variant = f'latinyz,{variant}'
             else:
-                real_variant = 'latin,%s' % variant
+                real_variant = f'latin,{variant}'
         else:
-            real_variant = ',%s' % variant
+            real_variant = f',{variant}'
 
         real_options = [opt for opt in options if not opt.startswith('lv3:')]
         if not latin:
@@ -663,7 +653,7 @@ class Page(plugin.Plugin):
             real_options.append('lv3:ralt_switch')
 
         real_model = model
-        if model == 'pc105':
+        if real_model == 'pc105':
             if real_layout == 'br':
                 real_model = 'abnt2'
             elif real_layout == 'jp':
@@ -681,26 +671,26 @@ class Page(plugin.Plugin):
         try:
             layout = keyboard_names.layout_id(ret, layout_name)
         except KeyError:
-            self.debug("Unknown keyboard layout '%s'" % layout_name)
+            self.debug(f"Unknown keyboard layout '{layout_name}'")
             return
 
         if not keyboard_names.has_variants(ret, layout):
-            self.debug("No known variants for layout '%s'" % layout)
+            self.debug(f"No known variants for layout '{layout}'")
             variant = ''
         else:
             try:
                 variant = keyboard_names.variant_id(
                     ret, layout, variant_name)
             except KeyError:
-                self.debug("Unknown keyboard variant '%s' for layout '%s'" %
-                           (variant_name, layout_name))
+                self.debug(
+                    f"Unknown keyboard variant '{variant_name}' for layout '{layout_name}'"
+                )
                 return
 
         (model, layout, variant, options) = \
-            self.adjust_keyboard(model, layout, variant, [])
+                self.adjust_keyboard(model, layout, variant, [])
         self.set_gnome_keyboard_layout(layout, variant)
-        self.debug("Setting keyboard layout: %s %s %s %s" %
-                   (model, layout, variant, options))
+        self.debug(f"Setting keyboard layout: {model} {layout} {variant} {options}")
         self.apply_real_keyboard(model, layout, variant, options)
 
     @staticmethod
@@ -756,78 +746,71 @@ class Page(plugin.Plugin):
             # Did they remove /etc/X11/xorg.conf or something? Oh well,
             # better to carry on than to crash.
             return
-        newconfig = open(newconfigfile, 'w')
+        with open(newconfigfile, 'w') as newconfig:
+            re_section_inputdevice = re.compile(r'\s*Section\s+"InputDevice"\s*$')
+            re_driver_kbd = re.compile(r'\s*Driver\s+"kbd"\s*$')
+            re_endsection = re.compile(r'\s*EndSection\s*$')
+            re_option_xkbmodel = re.compile(r'(\s*Option\s*"XkbModel"\s*).*')
+            re_option_xkblayout = re.compile(r'(\s*Option\s*"XkbLayout"\s*).*')
+            re_option_xkbvariant = re.compile(r'(\s*Option\s*"XkbVariant"\s*).*')
+            re_option_xkboptions = re.compile(r'(\s*Option\s*"XkbOptions"\s*).*')
+            in_inputdevice = False
+            in_inputdevice_kbd = False
+            done = {'model': model == '', 'layout': False,
+                    'variant': variant == '', 'options': options == ''}
 
-        re_section_inputdevice = re.compile(r'\s*Section\s+"InputDevice"\s*$')
-        re_driver_kbd = re.compile(r'\s*Driver\s+"kbd"\s*$')
-        re_endsection = re.compile(r'\s*EndSection\s*$')
-        re_option_xkbmodel = re.compile(r'(\s*Option\s*"XkbModel"\s*).*')
-        re_option_xkblayout = re.compile(r'(\s*Option\s*"XkbLayout"\s*).*')
-        re_option_xkbvariant = re.compile(r'(\s*Option\s*"XkbVariant"\s*).*')
-        re_option_xkboptions = re.compile(r'(\s*Option\s*"XkbOptions"\s*).*')
-        in_inputdevice = False
-        in_inputdevice_kbd = False
-        done = {'model': model == '', 'layout': False,
-                'variant': variant == '', 'options': options == ''}
-
-        for line in oldconfig:
-            line = line.rstrip('\n')
-            if re_section_inputdevice.match(line) is not None:
-                in_inputdevice = True
-            elif in_inputdevice and re_driver_kbd.match(line) is not None:
-                in_inputdevice_kbd = True
-            elif re_endsection.match(line) is not None:
-                if in_inputdevice_kbd:
-                    if not done['model']:
-                        print('\tOption\t\t"XkbModel"\t"%s"' % model,
-                              file=newconfig)
-                    if not done['layout']:
-                        print('\tOption\t\t"XkbLayout"\t"%s"' % layout,
-                              file=newconfig)
-                    if not done['variant']:
-                        print('\tOption\t\t"XkbVariant"\t"%s"' % variant,
-                              file=newconfig)
-                    if not done['options']:
-                        print('\tOption\t\t"XkbOptions"\t"%s"' % options,
-                              file=newconfig)
-                in_inputdevice = False
-                in_inputdevice_kbd = False
-                done = {'model': model == '', 'layout': False,
-                        'variant': variant == '', 'options': options == ''}
-            elif in_inputdevice_kbd:
-                match = re_option_xkbmodel.match(line)
-                if match is not None:
-                    if model == '':
-                        # hmm, not quite sure what to do here; guessing that
-                        # forcing to pc105 will be reasonable
-                        line = match.group(1) + '"pc105"'
-                    else:
-                        line = match.group(1) + '"%s"' % model
-                    done['model'] = True
-                else:
-                    match = re_option_xkblayout.match(line)
+            for line in oldconfig:
+                line = line.rstrip('\n')
+                if re_section_inputdevice.match(line) is not None:
+                    in_inputdevice = True
+                elif in_inputdevice and re_driver_kbd.match(line) is not None:
+                    in_inputdevice_kbd = True
+                elif re_endsection.match(line) is not None:
+                    if in_inputdevice_kbd:
+                        if not done['model']:
+                            print('\tOption\t\t"XkbModel"\t"%s"' % model,
+                                  file=newconfig)
+                        if not done['layout']:
+                            print('\tOption\t\t"XkbLayout"\t"%s"' % layout,
+                                  file=newconfig)
+                        if not done['variant']:
+                            print('\tOption\t\t"XkbVariant"\t"%s"' % variant,
+                                  file=newconfig)
+                        if not done['options']:
+                            print('\tOption\t\t"XkbOptions"\t"%s"' % options,
+                                  file=newconfig)
+                    in_inputdevice = False
+                    in_inputdevice_kbd = False
+                    done = {'model': model == '', 'layout': False,
+                            'variant': variant == '', 'options': options == ''}
+                elif in_inputdevice_kbd:
+                    match = re_option_xkbmodel.match(line)
                     if match is not None:
-                        line = match.group(1) + '"%s"' % layout
-                        done['layout'] = True
+                        line = f'{match[1]}"pc105"' if model == '' else f'{match[1]}"{model}"'
+                        done['model'] = True
                     else:
-                        match = re_option_xkbvariant.match(line)
+                        match = re_option_xkblayout.match(line)
                         if match is not None:
-                            if variant == '':
-                                continue  # delete this line
-                            else:
-                                line = match.group(1) + '"%s"' % variant
-                            done['variant'] = True
+                            line = f'{match[1]}"{layout}"'
+                            done['layout'] = True
                         else:
-                            match = re_option_xkboptions.match(line)
+                            match = re_option_xkbvariant.match(line)
                             if match is not None:
-                                if options == '':
+                                if variant == '':
                                     continue  # delete this line
                                 else:
-                                    line = match.group(1) + '"%s"' % options
-                                done['options'] = True
-            print(line, file=newconfig)
+                                    line = f'{match[1]}"{variant}"'
+                                done['variant'] = True
+                            else:
+                                match = re_option_xkboptions.match(line)
+                                if match is not None:
+                                    if options == '':
+                                        continue  # delete this line
+                                    else:
+                                        line = f'{match[1]}"{options}"'
+                                    done['options'] = True
+                print(line, file=newconfig)
 
-        newconfig.close()
         oldconfig.close()
         os.rename(newconfigfile, oldconfigfile)
 
@@ -842,10 +825,7 @@ class Page(plugin.Plugin):
         layout = self.db.get('keyboard-configuration/layoutcode')
         variant = self.db.get('keyboard-configuration/variantcode')
         options = self.db.get('keyboard-configuration/optionscode')
-        if options:
-            options_list = options.split(',')
-        else:
-            options_list = []
+        options_list = options.split(',') if options else []
         self.set_gnome_keyboard_layout(layout, variant)
         self.apply_real_keyboard(model, layout, variant, options_list)
 

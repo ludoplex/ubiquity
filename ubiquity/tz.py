@@ -39,9 +39,7 @@ class SystemTzInfo(datetime.tzinfo):
         self.tz = tz
 
     def _select_tz(self):
-        tzbackup = None
-        if 'TZ' in os.environ:
-            tzbackup = os.environ['TZ']
+        tzbackup = os.environ.get('TZ', None)
         if self.tz is not None:
             os.environ['TZ'] = self.tz
         time.tzset()
@@ -88,14 +86,12 @@ class SystemTzInfo(datetime.tzinfo):
                 # no DST information, so assume no DST; None would be more
                 # accurate but causes awkwardness in fromutc()
                 return datetime.timedelta(0)
-            else:
-                localtime = time.localtime(_seconds_since_epoch(dt))
-                if localtime.tm_isdst != 1:
-                    # not in DST
-                    return datetime.timedelta(0)
-                else:
-                    dstminutes = (time.timezone - time.altzone) / 60
-                    return datetime.timedelta(minutes=int(dstminutes))
+            localtime = time.localtime(_seconds_since_epoch(dt))
+            if localtime.tm_isdst != 1:
+                # not in DST
+                return datetime.timedelta(0)
+            dstminutes = (time.timezone - time.altzone) / 60
+            return datetime.timedelta(minutes=int(dstminutes))
         finally:
             self._restore_tz(tzbackup)
 
@@ -172,10 +168,7 @@ class Location(object):
             self.human_country = self.country
         self.zone = bits[2]
         self.human_zone = self.zone.replace('_', ' ').split('/')[-1]
-        if len(bits) > 3:
-            self.comment = bits[3]
-        else:
-            self.comment = None
+        self.comment = bits[3] if len(bits) > 3 else None
         self.latitude = _parse_position(latitude, 2)
         self.longitude = _parse_position(longitude, 3)
 
@@ -188,7 +181,7 @@ class Location(object):
             self.md5sum = None
 
         try:
-            today = datetime.datetime.today()
+            today = datetime.datetime.now()
         except (ValueError, OverflowError):
             # Some versions of Python have problems with clocks set before
             # the epoch (http://python.org/sf/1646728). Assuming that the

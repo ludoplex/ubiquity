@@ -10,7 +10,7 @@ from ubiquity import gtkwidgets, plugin_manager
 
 
 def mock_get_string(name, lang=None, prefix=None):
-    return "%s: %s" % (lang, name)
+    return f"{lang}: {name}"
 
 
 class UserSetupTests(unittest.TestCase):

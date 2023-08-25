@@ -56,19 +56,18 @@ class GtkNetworkStore(NetworkStore, Gtk.TreeStore):
         self[it][2] = strength
 
     def remove_aps_not_in(self, devid, ssids):
-        dev_it = self._it_for_device(devid)
-        if not dev_it:
+        if dev_it := self._it_for_device(devid):
+            self._remove_rows_not_in(dev_it, ssids)
+        else:
             return
-        self._remove_rows_not_in(dev_it, ssids)
 
     def _remove_rows_not_in(self, parent_it, ids):
         it = self.iter_children(parent_it)
         while it:
             if self[it][0] in ids:
                 it = self.iter_next(it)
-            else:
-                if not self.remove(it):
-                    return
+            elif not self.remove(it):
+                return
 
     def _it_for_device(self, devid):
         it = self.get_iter_first()
@@ -194,10 +193,7 @@ class NetworkManagerTreeView(Gtk.TreeView):
                   'nm-signal-75-secure',
                   'nm-signal-100-secure']:
             ico = it.lookup_icon(n, 22, 0)
-            if ico:
-                ico = ico.load_icon()
-            else:
-                ico = default
+            ico = ico.load_icon() if ico else default
             self.icons.append(ico)
 
     def pixbuf_func(self, column, cell, model, iterator, data):
@@ -223,16 +219,14 @@ class NetworkManagerTreeView(Gtk.TreeView):
         ssid = model[iterator][0]
 
         if not model.iter_parent(iterator):
-            txt = '%s %s' % (model[iterator][1], model[iterator][2])
+            txt = f'{model[iterator][1]} {model[iterator][2]}'
             cell.set_property('text', txt)
         else:
             cell.set_property('text', ssid)
 
     def is_row_an_ap(self):
         model, iterator = self.get_selection().get_selected()
-        if iterator is None:
-            return False
-        return model.iter_parent(iterator) is not None
+        return False if iterator is None else model.iter_parent(iterator) is not None
 
     def is_row_connected(self):
         model, iterator = self.get_selection().get_selected()
@@ -240,10 +234,7 @@ class NetworkManagerTreeView(Gtk.TreeView):
             return False
         ssid = model[iterator][0]
         parent = model.iter_parent(iterator)
-        if parent and self.wifi_model.is_connected(model[parent][0], ssid):
-            return True
-        else:
-            return False
+        return bool(parent and self.wifi_model.is_connected(model[parent][0], ssid))
 
     def find_ap(self, device, ssid):
         for ap in device.get_access_points():
@@ -271,8 +262,7 @@ class NetworkManagerTreeView(Gtk.TreeView):
         model, iterator = self.get_selection().get_selected()
         if iterator is None:
             return
-        parent = model.iter_parent(iterator)
-        if parent:
+        if parent := model.iter_parent(iterator):
             try:
                 devid = model[parent][0]
                 ssid = model[iterator][0]
@@ -308,7 +298,7 @@ class NetworkManagerTreeView(Gtk.TreeView):
                     Gtk.MessageType.ERROR, Gtk.ButtonsType.CLOSE,
                     "Failed to connect to wireless network"
                 )
-                dialog.format_secondary_text("{}".format(e))
+                dialog.format_secondary_text(f"{e}")
                 dialog.run()
                 dialog.hide()
 
@@ -362,10 +352,10 @@ class NetworkManagerWidget(Gtk.Box):
         self.view.disconnect_from_ap()
 
     def changed(self, selection):
-        iterator = selection.get_selected()[1]
-        if not iterator:
+        if iterator := selection.get_selected()[1]:
+            self.emit('selection_changed')
+        else:
             return
-        self.emit('selection_changed')
 
 
 GObject.type_register(NetworkManagerWidget)

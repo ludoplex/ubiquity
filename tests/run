@@ -15,8 +15,7 @@ def find_files(directory, pattern):
     for root, dirs, files in os.walk(directory):
         for basename in files:
             if fnmatch.fnmatch(basename, pattern):
-                filename = os.path.join(root, basename)
-                yield filename
+                yield os.path.join(root, basename)
 
 
 usage = '%prog [options]'
@@ -44,7 +43,7 @@ if options.xvfb:
     if options.xvfb_log is not None:
         xvfb_argv.extend(['-e', options.xvfb_log])
     if 'TMPDIR' in os.environ:
-        xvfb_argv.extend(['env', 'TMPDIR=%s' % os.environ['TMPDIR']])
+        xvfb_argv.extend(['env', f"TMPDIR={os.environ['TMPDIR']}"])
         del os.environ['TMPDIR']
     argv[:0] = xvfb_argv
     os.execvp('xvfb-run', argv)
@@ -56,12 +55,9 @@ extra_modules = ['mockresolver']
 
 re_exec = False
 ld_library_path = os.environ.get('LD_LIBRARY_PATH')
-if ld_library_path is None:
-    ld_library_path = []
-else:
-    ld_library_path = ld_library_path.split(':')
+ld_library_path = [] if ld_library_path is None else ld_library_path.split(':')
 for extra_module in reversed(extra_modules):
-    libdir = 'src/%s/.libs' % extra_module
+    libdir = f'src/{extra_module}/.libs'
     if libdir not in ld_library_path:
         ld_library_path.insert(0, libdir)
         re_exec = True
@@ -70,7 +66,8 @@ if re_exec:
     os.execv(sys.argv[0], sys.argv)
 
 os.environ['GI_TYPELIB_PATH'] = ':'.join(
-    ['src/%s' % extra_module for extra_module in extra_modules])
+    [f'src/{extra_module}' for extra_module in extra_modules]
+)
 
 if 'DEB_HOST_ARCH' not in os.environ:
     os.environ['DEB_HOST_ARCH'] = subprocess.check_output(
@@ -109,11 +106,7 @@ if options.coverage:
     cov = coverage()
     cov.start()
 
-if args:
-    test_filter = args[0]
-else:
-    test_filter = ''
-
+test_filter = args[0] if args else ''
 tests = [t[:-3] for t in os.listdir('tests')
          if (t.startswith('test_') and t.endswith('.py') and
              re.search(test_filter, t))]

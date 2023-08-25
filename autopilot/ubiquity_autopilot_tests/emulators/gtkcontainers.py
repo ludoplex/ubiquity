@@ -89,7 +89,7 @@ class GtkBox(GtkContainers):
                 logger.debug("top item {0} selected"
                              .format(top_item.accessible_name))
                 # Now select required Language
-                self.kbd.type(item.accessible_name[0:3])
+                self.kbd.type(item.accessible_name[:3])
                 item.click()
                 # check selected
                 if item.selected:
@@ -111,9 +111,7 @@ class GtkBox(GtkContainers):
         # lets get all items
         treeview_items = treeview.get_all_items()
 
-        # get a language which the first two chars can be ascii decoded
-        test_language = self._get_decode_ascii_item(treeview_items)
-        return test_language
+        return self._get_decode_ascii_item(treeview_items)
 
     def _get_decode_ascii_item(self, items):
         """ decodes a list of unicode items """
@@ -125,55 +123,53 @@ class GtkBox(GtkContainers):
         while True:
             lang_item = random.choice(items)
             l_unicode = lang_item.accessible_name
-            logger.debug("Attempting to decode %s" % l_unicode)
-            lan = l_unicode[0:2]
+            logger.debug(f"Attempting to decode {l_unicode}")
+            lan = l_unicode[:2]
             try:
                 l_ascii = lan.encode('ascii')
             except UnicodeEncodeError:
-                logger.debug("%s could not be decoded" % l_unicode)
-                pass
+                logger.debug(f"{l_unicode} could not be decoded")
             if l_ascii:
-                logger.debug("%s decoded successfully" % l_unicode)
+                logger.debug(f"{l_unicode} decoded successfully")
                 break
-        logger.debug("Returning selected language: %s" % l_unicode)
+        logger.debug(f"Returning selected language: {l_unicode}")
         return lang_item
 
     def select_location(self, location):
         """ Selects a location on the timezone map """
-        if self.name == 'stepLocation':
-            logger.debug("select_location({0})".format(location))
-
-            location_map = self.select_single('CcTimezoneMap')
-            self.pointing_device.move_to_object(location_map)
-            x1, y1, x2, y2 = location_map.globalRect
-            # hmmmm this is tricky! and really hacky
-            pos = self.pointing_device.position()
-            x = pos[0]
-            y = pos[1]
-            x -= 25  # px
-            self.pointing_device.move(x, y)
-            while True:
-                entry = self.select_single('GtkEntry')
-                if entry.text != location:
-                    pos = self.pointing_device.position()
-                    x = pos[0]
-                    y = pos[1]
-                    y -= 10  # px
-                    self.pointing_device.move(x, y)
-                    self.pointing_device.click()
-                    if y < y1:
-                        logger.warning("We missed the location on the map and "
-                                       "ended up outside the globalRect. Now "
-                                       "using the default selected location "
-                                       "instead")
-                        break
-                else:
-                    expectThat(entry.text).equals(location)
-                    logger.debug("Location; '{0}' selected".format(location))
-                    break
-        else:
+        if self.name != 'stepLocation':
             raise ValueError("Function can only be called from a "
                              "stepLocation page object")
+        logger.debug("select_location({0})".format(location))
+
+        location_map = self.select_single('CcTimezoneMap')
+        self.pointing_device.move_to_object(location_map)
+        x1, y1, x2, y2 = location_map.globalRect
+        # hmmmm this is tricky! and really hacky
+        pos = self.pointing_device.position()
+        x = pos[0]
+        y = pos[1]
+        x -= 25  # px
+        self.pointing_device.move(x, y)
+        while True:
+            entry = self.select_single('GtkEntry')
+            if entry.text != location:
+                pos = self.pointing_device.position()
+                x = pos[0]
+                y = pos[1]
+                y -= 10  # px
+                self.pointing_device.move(x, y)
+                self.pointing_device.click()
+                if y < y1:
+                    logger.warning("We missed the location on the map and "
+                                   "ended up outside the globalRect. Now "
+                                   "using the default selected location "
+                                   "instead")
+                    break
+            else:
+                expectThat(entry.text).equals(location)
+                logger.debug("Location; '{0}' selected".format(location))
+                break
 
     def create_user(self, name, password):
         """ Creates a user account with password
@@ -236,17 +232,15 @@ class GtkBox(GtkContainers):
                     "not {1}".format(img.name, img.stock))
 
     def _enter_password(self, password):
-        if self.name == 'stepUserInfo':
-
-            while True:
-                self._enter_pass_phrase(password)
-                match = self._check_phrase_match()
-
-                if match:
-                    break
-        else:
+        if self.name != 'stepUserInfo':
             raise ValueError("enter_crypto_phrase() can only be called from "
                              "stepPartCrypto page object")
+        while True:
+            self._enter_pass_phrase(password)
+            match = self._check_phrase_match()
+
+            if match:
+                break
 
     def _enter_pass_phrase(self, phrase):
 
@@ -265,10 +259,7 @@ class GtkBox(GtkContainers):
     def _check_phrase_match(self, ):
         pwd1 = self.select_single(BuilderName='password').text
         pwd2 = self.select_single(BuilderName='verified_password').text
-        if pwd1 == pwd2:
-            return True
-        else:
-            return False
+        return pwd1 == pwd2
 
 
 class GtkAlignment(GtkContainers):
@@ -279,17 +270,15 @@ class GtkAlignment(GtkContainers):
         self.kbd = Keyboard.create()
 
     def enter_crypto_phrase(self, crypto_phrase):
-        if self.name == 'stepPartCrypto':
-
-            while True:
-                self._enter_pass_phrase(crypto_phrase)
-                match = self._check_crypto_phrase_match()
-
-                if match:
-                    break
-        else:
+        if self.name != 'stepPartCrypto':
             raise ValueError("enter_crypto_phrase() can only be called from "
                              "stepPartCrypto page object")
+        while True:
+            self._enter_pass_phrase(crypto_phrase)
+            match = self._check_crypto_phrase_match()
+
+            if match:
+                break
 
     def _enter_pass_phrase(self, phrase):
 
@@ -308,20 +297,16 @@ class GtkAlignment(GtkContainers):
     def _check_crypto_phrase_match(self, ):
         pwd1 = self.select_single(BuilderName='password').text
         pwd2 = self.select_single(BuilderName='verified_password').text
-        if pwd1 == pwd2:
-            return True
-        else:
-            return False
+        return pwd1 == pwd2
 
     def create_new_partition_table(self, ):
-        if self.name == 'stepPartAdvanced':
-            new_partition_button = self.select_single(
-                BuilderName='partition_button_new_label')
-            self.pointing_device.click_object(new_partition_button)
-            time.sleep(5)
-            self.kbd.press_and_release('Right')
-            self.kbd.press_and_release('Enter')
-            time.sleep(5)
-        else:
+        if self.name != 'stepPartAdvanced':
             raise ValueError("create_new_partition_table() can only be called "
                              "from stepPartAdvanced page object")
+        new_partition_button = self.select_single(
+            BuilderName='partition_button_new_label')
+        self.pointing_device.click_object(new_partition_button)
+        time.sleep(5)
+        self.kbd.press_and_release('Right')
+        self.kbd.press_and_release('Enter')
+        time.sleep(5)

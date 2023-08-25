@@ -71,15 +71,15 @@ class GtkTreeViewAccessible(AutopilotGtkEmulatorBase):
         :rtype: List of items in treeview
 
         """
-        item_list = []
         items = self._get_treeview_items()
         if startWith:
             logger.debug(
                 "Searching for items beginning with '{0}'".format(startWith))
-            for item in items:
-                if startWith in item.accessible_name[0:len(startWith) + 1]:
-                    item_list.append(item)
-            return item_list
+            return [
+                item
+                for item in items
+                if startWith in item.accessible_name[: len(startWith) + 1]
+            ]
         else:
             return items
 

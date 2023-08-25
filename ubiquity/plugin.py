@@ -44,9 +44,6 @@ class InstallPlugin(Plugin):
 # event loop.
 def only_this_page(target):
     def wrapper(self, *args, **kwargs):
-        if self.controller.dbfilter:
-            return target(self, *args, **kwargs)
-        else:
-            # gobject removes timeouts if they return non-True.
-            return True
+        return target(self, *args, **kwargs) if self.controller.dbfilter else True
+
     return wrapper

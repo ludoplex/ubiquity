@@ -104,17 +104,14 @@ class DebconfFilter:
     def debug_enabled(self, key):
         if key == 'filter' and os.environ.get('UBIQUITY_DEBUG_CORE') == '1':
             return True
-        if self.debug_re is not None and self.debug_re.search(key):
-            return True
-        return False
+        return bool(self.debug_re is not None and self.debug_re.search(key))
 
     def debug(self, key, *args):
         if self.debug_enabled(key):
             import time
             # bizarre time formatting code per syslogd
             time_str = time.ctime()[4:19]
-            print("%s debconf (%s): %s" % (time_str, key, ' '.join(args)),
-                  file=sys.stderr)
+            print(f"{time_str} debconf ({key}): {' '.join(args)}", file=sys.stderr)
 
     # Returns None if non-blocking and can't read a full line right now;
     # returns '' at end of file; otherwise as fileobj.readline().
@@ -240,11 +237,7 @@ class DebconfFilter:
         if not params:
             return True
         command = params[0].upper()
-        if len(params) > 1:
-            rest = params[1]
-        else:
-            rest = ''
-
+        rest = params[1] if len(params) > 1 else ''
         # Split parameters according to the command name.
         if valid_commands.get(command, 0) == 0:
             params = [rest]
@@ -276,8 +269,8 @@ class DebconfFilter:
             input_widgets = self.find_widgets([question])
 
             if len(input_widgets) > 0:
-                if self.automatic:
-                    if self.db.fget(question, 'seen') == 'true':
+                if self.db.fget(question, 'seen') == 'true':
+                    if self.automatic:
                         self.reply(30, 'question skipped', log=True)
                         self.next_go_backup = False
                         return True
@@ -315,7 +308,7 @@ class DebconfFilter:
                 widget.set(question, value)
 
         if command == 'SUBST' and len(params) >= 3:
-            (question, key) = params[0:2]
+            (question, key) = params[:2]
             value = ' '.join(params[2:])
             for widget in self.find_widgets([question], 'subst'):
                 self.debug('filter', 'widget found for', question)

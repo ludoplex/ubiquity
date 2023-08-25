@@ -54,10 +54,7 @@ def is_passphrase_valid(passphrase):
     if len(passphrase) > 64:
         return False
 
-    for c in passphrase:
-        if c not in string.hexdigits:
-            return False
-    return True
+    return all(c in string.hexdigits for c in passphrase)
 
 
 # Our wireless icons are unreadable over a white background, so...
@@ -113,7 +110,7 @@ class QtNetworkStore(QtGui.QStandardItemModel, NetworkStore):
         return [self.item(x).id for x in range(self.rowCount())]
 
     def add_device(self, devid, vendor, model):
-        item = QtGui.QStandardItem("%s %s" % (vendor, model))
+        item = QtGui.QStandardItem(f"{vendor} {model}")
         item.setIcon(QtGui.QIcon.fromTheme("network-wireless"))
         item.setSelectable(False)
         # devid is a dbus.ObjectPath, so we can't store it as a QVariant using
@@ -149,10 +146,10 @@ class QtNetworkStore(QtGui.QStandardItemModel, NetworkStore):
         self._update_item_icon(item)
 
     def remove_aps_not_in(self, devid, ssids):
-        dev_item = self._item_for_device(devid)
-        if not dev_item:
+        if dev_item := self._item_for_device(devid):
+            self._remove_rows_not_in(dev_item, ssids)
+        else:
             return
-        self._remove_rows_not_in(dev_item, ssids)
 
     def _remove_rows_not_in(self, parent_item, ids):
         row = 0
@@ -200,10 +197,7 @@ class QtNetworkStore(QtGui.QStandardItemModel, NetworkStore):
         item.setIcon(self._icons[icon])
 
     def _init_icons(self):
-        pixes = []
-        for level in range(5):
-            pixes.append(draw_level_pix(level))
-
+        pixes = [draw_level_pix(level) for level in range(5)]
         secure_icon = QtGui.QIcon.fromTheme("emblem-locked")
         secure_pix = secure_icon.pixmap(ICON_SIZE // 2, ICON_SIZE // 2)
         for level in range(5):
@@ -242,9 +236,7 @@ class NetworkManagerTreeView(QtWidgets.QTreeView):
 
     def is_row_an_ap(self):
         index = self.currentIndex()
-        if not index.isValid():
-            return False
-        return index.parent().isValid()
+        return False if not index.isValid() else index.parent().isValid()
 
     def _get_selected_row_ids(self):
         """
@@ -271,7 +263,7 @@ class NetworkManagerTreeView(QtWidgets.QTreeView):
         except Exception as e:
             dialog = QtWidgets.QMessageBox()
             dialog.setWindowTitle("Failed to connect to wireless network")
-            dialog.setText("{}".format(e))
+            dialog.setText(f"{e}")
             dialog.exec_()
 
     def get_cached_passphrase(self):
@@ -412,7 +404,7 @@ class NetworkManagerWidget(QtWidgets.QWidget):
                 return
 
             if state == nm.NM_STATE_DISCONNECTED \
-                    and old_state == nm.NM_STATE_CONNECTING:
+                        and old_state == nm.NM_STATE_CONNECTING:
                 self.progress_indicator.setText(
                     self.tr_dict['connection_failed_label'])
                 self.progress_indicator.show()
@@ -430,9 +422,9 @@ class NetworkManagerWidget(QtWidgets.QWidget):
                 self.progress_indicator.setSpinnerVisible(False)
                 return
 
-            syslog.syslog('NetworkManagerWidget._on_state_changed:'
-                          ' unhandled combination of nm states'
-                          ' old_state={} state={}'.format(old_state, state))
+            syslog.syslog(
+                f'NetworkManagerWidget._on_state_changed: unhandled combination of nm states old_state={old_state} state={state}'
+            )
         finally:
             self.state_changed.emit(state)
 

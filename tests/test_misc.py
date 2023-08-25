@@ -338,27 +338,28 @@ class GrubDefaultTests(unittest.TestCase):
     def iter_devices(self):
         """Iterate through devices, expanding abbreviated forms."""
         for grub_dev, os_dev, by_id_dev in self.devices:
-            yield ('(%s)' % grub_dev, '/dev/%s' % os_dev,
-                   '/dev/disk/by-id/%s' % by_id_dev)
+            yield (f'({grub_dev})', f'/dev/{os_dev}', f'/dev/disk/by-id/{by_id_dev}')
 
     def realpath_side_effect(self, filename):
         filename = os.path.abspath(filename)
-        for _, os_dev, by_id_dev in self.iter_devices():
-            if filename in (os_dev, by_id_dev):
-                return os_dev
-        return filename
+        return next(
+            (
+                os_dev
+                for _, os_dev, by_id_dev in self.iter_devices()
+                if filename in (os_dev, by_id_dev)
+            ),
+            filename,
+        )
 
     def samefile_side_effect(self, f1, f2):
         f1 = os.path.abspath(f1)
         f2 = os.path.abspath(f2)
         if f1 == f2:
             return True
-        for _, os_dev, by_id_dev in self.iter_devices():
-            if f1 == os_dev and f2 == by_id_dev:
-                return True
-            elif f1 == by_id_dev and f2 == os_dev:
-                return True
-        return False
+        return any(
+            f1 == os_dev and f2 == by_id_dev or f1 == by_id_dev and f2 == os_dev
+            for _, os_dev, by_id_dev in self.iter_devices()
+        )
 
     def boot_device_side_effect(self):
         return self.boot_device
@@ -367,16 +368,13 @@ class GrubDefaultTests(unittest.TestCase):
         return list(self.cdrom_mount)
 
     def grub_device_map_side_effect(self):
-        device_map = []
-        for grub_dev, _, by_id_dev in self.iter_devices():
-            device_map.append('%s\t%s' % (grub_dev, by_id_dev))
-        return device_map
+        return [
+            '%s\t%s' % (grub_dev, by_id_dev)
+            for grub_dev, _, by_id_dev in self.iter_devices()
+        ]
 
     def is_removable_side_effect(self, device):
-        if device in self.removable_devices:
-            return device
-        else:
-            return None
+        return device if device in self.removable_devices else None
 
     def test_removable(self):
         self.devices = [['hd0', 'sda', 'serial-number-for-sda']]

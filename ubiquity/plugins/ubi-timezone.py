@@ -83,14 +83,13 @@ class PageGtk(plugin.PluginUI):
 
     def select_city(self, unused_widget, city):
         city = city.get_property('zone')
-        loc = self.tzdb.get_loc(city)
-        if not loc:
-            self.controller.allow_go_forward(False)
-        else:
+        if loc := self.tzdb.get_loc(city):
             self.city_entry.set_text(loc.human_zone)
             self.city_entry.set_position(-1)
             self.timezone = city
             self.controller.allow_go_forward(True)
+        else:
+            self.controller.allow_go_forward(False)
 
     def changed(self, entry):
         from gi import require_version
@@ -228,6 +227,7 @@ class PageGtk(plugin.PluginUI):
             self.city_entry.set_text(model[iterator][0])
             self.city_entry.set_position(-1)
             return True
+
         completion.connect('match-selected', match_selected)
 
         def match_func(completion, key, iterator, data):
@@ -239,10 +239,11 @@ class PageGtk(plugin.PluginUI):
             if row[1]:
                 # The result came from geonames, and thus has an administrative
                 # zone attached to it.
-                text = '%s <small>(%s, %s)</small>' % (row[0], row[1], row[2])
+                text = f'{row[0]} <small>({row[1]}, {row[2]})</small>'
             else:
-                text = '%s <small>(%s)</small>' % (row[0], row[2])
+                text = f'{row[0]} <small>({row[2]})</small>'
             cell.set_property('markup', text)
+
         cell = Gtk.CellRendererText()
         completion.pack_start(cell, True)
         completion.set_match_func(match_func, None)
@@ -444,7 +445,7 @@ class Page(plugin.Plugin):
             self.db.fset('time/zone', 'seen', 'false')
             cc = self.db.get('debian-installer/country')
             try:
-                self.db.get('tzsetup/country/%s' % cc)
+                self.db.get(f'tzsetup/country/{cc}')
                 # ... and if that succeeded:
                 self.multiple = True
             except debconf.DebconfError:
@@ -472,25 +473,23 @@ class Page(plugin.Plugin):
             # Some countries don't have a default zone, so just pick the
             # first choice in the list.
             if not zone:
-                choices_c = self.choices_untranslated(question)
-                if choices_c:
+                if choices_c := self.choices_untranslated(question):
                     zone = choices_c[0]
             self.ui.set_timezone(zone)
 
-        if self.automatic_page:
-            # TODO: invade frontend's privacy to avoid entering infinite
-            # loop when trying to back up over timezone question (which
-            # isn't possible anyway since it's just after partitioning);
-            # this needs to be tidied up substantially when generalising
-            # ubiquity/automatic/*
-            self.frontend.backup = False
-            return True
-        else:
+        if not self.automatic_page:
             return plugin.Plugin.run(self, priority, question)
+        # TODO: invade frontend's privacy to avoid entering infinite
+        # loop when trying to back up over timezone question (which
+        # isn't possible anyway since it's just after partitioning);
+        # this needs to be tidied up substantially when generalising
+        # ubiquity/automatic/*
+        self.frontend.backup = False
+        return True
 
     def get_default_for_region(self, region):
         try:
-            return self.db.get('tzsetup/country/%s' % region)
+            return self.db.get(f'tzsetup/country/{region}')
         except debconf.DebconfError:
             return None
 
@@ -507,8 +506,7 @@ class Page(plugin.Plugin):
             return self.regions[region]
 
         try:
-            codes = self.choices_untranslated(
-                'localechooser/countrylist/%s' % region)
+            codes = self.choices_untranslated(f'localechooser/countrylist/{region}')
         except debconf.DebconfError:
             codes = []
         self.regions[region] = codes
@@ -520,7 +518,8 @@ class Page(plugin.Plugin):
         continents = self.choices_untranslated('localechooser/continentlist')
         for continent in continents:
             country_codes = self.choices_untranslated(
-                'localechooser/countrylist/%s' % continent.replace(' ', '_'))
+                f"localechooser/countrylist/{continent.replace(' ', '_')}"
+            )
             for c in country_codes:
                 shortlist = self.build_shortlist_timezone_pairs(c, sort=False)
                 longlist = self.build_longlist_timezone_pairs(c, sort=False)
@@ -549,7 +548,8 @@ class Page(plugin.Plugin):
     def build_shortlist_region_pairs(self, language_code):
         try:
             shortlist = self.choices_display_map(
-                'localechooser/shortlist/%s' % language_code)
+                f'localechooser/shortlist/{language_code}'
+            )
             # Remove any 'other' entry
             for pair in shortlist.items():
                 if pair[1] == 'other':
@@ -595,8 +595,7 @@ class Page(plugin.Plugin):
 
     def build_shortlist_timezone_pairs(self, country_code, sort=True):
         try:
-            shortlist = self.choices_display_map(
-                'tzsetup/country/%s' % country_code)
+            shortlist = self.choices_display_map(f'tzsetup/country/{country_code}')
             for pair in list(shortlist.items()):
                 # Remove any 'other' entry, we don't need it
                 if pair[1] == 'other':
@@ -615,13 +614,13 @@ class Page(plugin.Plugin):
                 'localechooser/continentlist')
             for continent in continents:
                 choices = self.choices_display_map(
-                    'localechooser/countrylist/%s' %
-                    continent.replace(' ', '_'))
+                    f"localechooser/countrylist/{continent.replace(' ', '_')}"
+                )
                 for name, code in choices.items():
                     if code == country:
                         return name
         except debconf.DebconfError as e:
-            print("Couldn't get country name for %s: %s" % (country, e))
+            print(f"Couldn't get country name for {country}: {e}")
         return None
 
     def get_city_name_from_tzdata(self, tz):
@@ -632,12 +631,12 @@ class Page(plugin.Plugin):
         try:
             areas = self.choices_untranslated('tzdata/Areas')
             for area in areas:
-                zones = self.choices_display_map('tzdata/Zones/%s' % area)
+                zones = self.choices_display_map(f'tzdata/Zones/{area}')
                 for name, code in zones.items():
                     if code == city:
                         return name
         except debconf.DebconfError as e:
-            print("Couldn't get city name for %s: %s" % (tz, e))
+            print(f"Couldn't get city name for {tz}: {e}")
         return None
 
     def get_fallback_translation_for_tz(self, country, tz):
@@ -653,7 +652,7 @@ class Page(plugin.Plugin):
             if city_name is None:
                 city_name = tz  # fall back to ASCII name
             city_name = city_name.split('/')[-1]
-            return "%s (%s)" % (country_name, city_name)
+            return f"{country_name} ({city_name})"
         else:
             return country_name
 
@@ -702,8 +701,7 @@ class Page(plugin.Plugin):
             return []  # ?
         rv = []
         try:
-            regions = self.choices_untranslated(
-                'localechooser/countrylist/%s' % continent)
+            regions = self.choices_untranslated(f'localechooser/countrylist/{continent}')
             for region in regions:
                 rv += self.build_longlist_timezone_pairs(region, sort=False)
             rv.sort(key=self.collation_key)
@@ -712,8 +710,7 @@ class Page(plugin.Plugin):
         return rv
 
     def set_di_country(self, zone):
-        location = self.tzdb.get_loc(zone)
-        if location:
+        if location := self.tzdb.get_loc(zone):
             self.preseed('debian-installer/country', location.country)
 
     def ok_handler(self):
@@ -738,7 +735,7 @@ class Install(plugin.InstallPlugin):
         if 'UBIQUITY_OEM_USER_CONFIG' in os.environ:
             tzsetup_script += '-oem'
 
-        return (['sh', '-c', '%s && %s' % (tzsetup_script, clock_script)], [])
+        return ['sh', '-c', f'{tzsetup_script} && {clock_script}'], []
 
     def install(self, target, progress, *args, **kwargs):
         progress.info('ubiquity/install/timezone')

@@ -48,7 +48,7 @@ def _realpath_root_recurse(root, filename):
     bits = ['/'] + filename.split('/')[1:]
 
     for i in range(2, len(bits) + 1):
-        component = os.path.join(*bits[0:i])
+        component = os.path.join(*bits[:i])
         fullcomponent = os.path.join(root, component[1:])
         # Resolve symbolic links.
         if os.path.islink(fullcomponent):
@@ -57,9 +57,8 @@ def _realpath_root_recurse(root, filename):
                 # Infinite loop -- return original component + rest of
                 # the path
                 return os.path.abspath(os.path.join(component, *bits[i:]))
-            else:
-                newpath = os.path.join(resolved, *bits[i:])
-                return _realpath_root_recurse(root, newpath)
+            newpath = os.path.join(resolved, *bits[i:])
+            return _realpath_root_recurse(root, newpath)
 
     return os.path.abspath(filename)
 

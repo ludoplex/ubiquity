@@ -88,13 +88,13 @@ class UbiquityUI(QtWidgets.QMainWindow):
                 elif "DISTRIB_RELEASE=" in line:
                     distro_release = str.strip(line.split("=")[1], '\n')
                     if distro_release.startswith('"') and \
-                            distro_release.endswith('"'):
+                                distro_release.endswith('"'):
                         distro_release = distro_release[1:-1]
 
         self.distro_name_label.setText(distro_name)
         self.distro_release_label.setText(distro_release)
 
-        self.setWindowTitle("%s %s" % (distro_name, distro_release))
+        self.setWindowTitle(f"{distro_name} {distro_release}")
 
     def setWizard(self, wizardRef):
         self.wizard = wizardRef
@@ -202,7 +202,7 @@ class Wizard(BaseFrontend):
         if os.path.isfile(logoDirectory + distro + ".svgz"):
             self.icon_widget.load(logoDirectory + distro + ".svgz")
         else:
-            self.icon_widget.load(logoDirectory + "branding.svgz")
+            self.icon_widget.load(f"{logoDirectory}branding.svgz")
         branding_layout = QtWidgets.QHBoxLayout()
         branding_layout.addItem(
             QtWidgets.QSpacerItem(1, 1,
@@ -354,10 +354,7 @@ class Wizard(BaseFrontend):
         misc.add_connection_watch(self.network_change)
 
     def _show_progress_bar(self, show):
-        if show:
-            widget = self.ui.progress_widget
-        else:
-            widget = self.ui.progress_placeholder
+        widget = self.ui.progress_widget if show else self.ui.progress_placeholder
         self.ui.progress_stack.setCurrentWidget(widget)
 
     def _create_breadcrumb(self, name):
@@ -394,7 +391,7 @@ class Wizard(BaseFrontend):
             self.previous_excepthook(exctype, excvalue, exctb)
         else:
             dialog = QtWidgets.QDialog(self.ui)
-            uic.loadUi("%s/crashdialog.ui" % UIDIR, dialog)
+            uic.loadUi(f"{UIDIR}/crashdialog.ui", dialog)
             dialog.crash_detail.setText(tbtext)
             dialog.exec_()
             sys.exit(1)

@@ -53,7 +53,7 @@ class expectThat(object):
         return getattr(super(expectThat, self), name)
 
     def __repr__(self,):
-        return 'expectThat(%s)' % repr(self.value)
+        return f'expectThat({repr(self.value)})'
 
     # now som rich comparisons
     # all we really need is just ==, != and is_unicode and a contains
@@ -63,7 +63,7 @@ class expectThat(object):
         try:
             assert self.value == compareValue, message
         except AssertionError:
-            logger.error("NON_FATAL_ERROR: %s" % message, exc_info=True)
+            logger.error(f"NON_FATAL_ERROR: {message}", exc_info=True)
             global non_fatal_errors
             e = traceback.format_exc(limit=5)
             non_fatal_errors.append(e)
@@ -75,7 +75,7 @@ class expectThat(object):
         try:
             assert self.value != compareValue, message
         except AssertionError as e:
-            logger.error("NON_FATAL_ERROR: %s" % message, exc_info=True)
+            logger.error(f"NON_FATAL_ERROR: {message}", exc_info=True)
             global non_fatal_errors
             e = traceback.format_exc(limit=5)
             non_fatal_errors.append(e)
@@ -89,7 +89,7 @@ class expectThat(object):
         try:
             assert self.value == compareValue, message
         except AssertionError:
-            logger.error("NON_FATAL_ERROR: %s" % message, exc_info=True)
+            logger.error(f"NON_FATAL_ERROR: {message}", exc_info=True)
             global non_fatal_errors
             e = traceback.format_exc(limit=5)
             non_fatal_errors.append(e)
@@ -104,7 +104,7 @@ class expectThat(object):
         try:
             assert self.value != compareValue, message
         except AssertionError as e:
-            logger.error("NON_FATAL_ERROR: %s" % message, exc_info=True)
+            logger.error(f"NON_FATAL_ERROR: {message}", exc_info=True)
             global non_fatal_errors
             e = traceback.format_exc(limit=5)
             non_fatal_errors.append(e)
@@ -114,11 +114,11 @@ class expectThat(object):
             message = msg
         else:
             message = "Expected to be instance of type 'unicode' but is an "\
-                "instance of type '{0}'".format(self.value.__class__.__name__)
+                    "instance of type '{0}'".format(self.value.__class__.__name__)
         try:
             assert isinstance(self.value, str), message
         except AssertionError as e:
-            logger.error("NON_FATAL_ERROR: %s" % message, exc_info=True)
+            logger.error(f"NON_FATAL_ERROR: {message}", exc_info=True)
             global non_fatal_errors
             non_fatal_errors.append(e)
 
@@ -131,7 +131,7 @@ class expectThat(object):
         try:
             assert compareValue in self.value, message
         except AssertionError as e:
-            logger.error("NON_FATAL_ERROR: %s" % message, exc_info=True)
+            logger.error(f"NON_FATAL_ERROR: {message}", exc_info=True)
             global non_fatal_errors
             non_fatal_errors.append(e)
 
@@ -140,11 +140,11 @@ class expectThat(object):
             message = msg
         else:
             message = 'Expected {0} to almost equal {1}, but it '\
-                'doesnt'.format(repr(self.value), repr(compareValue))
+                    'doesnt'.format(repr(self.value), repr(compareValue))
         try:
             result = self._approx_equal(self.value, compareValue)
             assert result, message
         except AssertionError as e:
-            logger.error("NON_FATAL_ERROR: %s" % message, exc_info=True)
+            logger.error(f"NON_FATAL_ERROR: {message}", exc_info=True)
             global non_fatal_errors
             non_fatal_errors.append(e)

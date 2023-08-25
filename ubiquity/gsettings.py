@@ -86,9 +86,7 @@ def get_list(schema, key, user=None):
         return
 
     try:
-        # This only works reliably with int and strings
-        elements = eval(value, None, None)
-        return elements
+        return eval(value, None, None)
     except Exception:
         return
 

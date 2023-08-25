@@ -80,10 +80,7 @@ class Wizard(BaseFrontend):
         telemetry.get().add_stage(telemetry.START_INSTALL_STAGE_TAG)
 
         for x in self.pages:
-            if issubclass(x.filter_class, Plugin):
-                ui = x.ui
-            else:
-                ui = None
+            ui = x.ui if issubclass(x.filter_class, Plugin) else None
             self.start_debconf()
             self.dbfilter = x.filter_class(self, ui=ui)
             self.dbfilter.start(auto_process=True)
@@ -155,12 +152,11 @@ class Wizard(BaseFrontend):
         return callback(source, debconf_condition)
 
     def debconffilter_done(self, dbfilter):
-        if BaseFrontend.debconffilter_done(self, dbfilter):
-            if self.mainloop.is_running():
-                self.mainloop.quit()
-            return True
-        else:
+        if not BaseFrontend.debconffilter_done(self, dbfilter):
             return False
+        if self.mainloop.is_running():
+            self.mainloop.quit()
+        return True
 
     def refresh(self):
         """Take the opportunity to process pending items in the event loop."""

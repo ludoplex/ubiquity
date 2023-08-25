@@ -73,9 +73,9 @@ def disable_autologin():
     for name in ('/etc/gdm3/custom.conf', '/etc/kde4/kdm/kdmrc',
                  '/etc/lxdm/lxdm.conf', '/etc/xdg/lubuntu/lxdm/lxdm.conf',
                  '/etc/lightdm/lightdm.conf'):
-        if os.path.exists('%s.oem' % name):
+        if os.path.exists(f'{name}.oem'):
             try:
-                os.rename('%s.oem' % name, name)
+                os.rename(f'{name}.oem', name)
             except OSError:
                 traceback.print_exc()
 
@@ -157,29 +157,26 @@ def open_terminal():
             if fb_has('VESA'):
                 got_fb = True
 
-            devnull = open('/dev/null', 'w')
-
-            if not got_fb:
-                subprocess.call(['modprobe', '-q', 'vesafb'],
-                                stdout=devnull, stderr=devnull)
-                if fb_has(''):
-                    got_fb = True
-
-            if not got_fb:
-                subprocess.call(['modprobe', '-q', 'vga16fb'],
-                                stdout=devnull, stderr=devnull)
-                if fb_has(''):
-                    got_fb = True
-
-            if got_fb:
-                if not os.path.isdir('/sys/class/graphics/fbcon'):
-                    subprocess.call(['modprobe', '-q', 'fbcon'],
+            with open('/dev/null', 'w') as devnull:
+                if not got_fb:
+                    subprocess.call(['modprobe', '-q', 'vesafb'],
                                     stdout=devnull, stderr=devnull)
+                    if fb_has(''):
+                        got_fb = True
 
-                # TODO: import debian-installer-utils and use update-dev?
-                subprocess.call(['udevadm', 'settle'])
+                if not got_fb:
+                    subprocess.call(['modprobe', '-q', 'vga16fb'],
+                                    stdout=devnull, stderr=devnull)
+                    if fb_has(''):
+                        got_fb = True
 
-            devnull.close()
+                if got_fb:
+                    if not os.path.isdir('/sys/class/graphics/fbcon'):
+                        subprocess.call(['modprobe', '-q', 'fbcon'],
+                                        stdout=devnull, stderr=devnull)
+
+                    # TODO: import debian-installer-utils and use update-dev?
+                    subprocess.call(['udevadm', 'settle'])
 
             if os.path.exists('/dev/fb0'):
                 bterm_args = ['bterm',
@@ -210,17 +207,16 @@ def start_debconf():
         debconfrc_fd, debconfrc = tempfile.mkstemp()
         os.chmod(debconfrc, 0o644)
         debconfrc_file = os.fdopen(debconfrc_fd, 'w')
-        orig_debconfrc = open('/etc/debconf.conf')
-        state = 0
-        for line in orig_debconfrc:
-            if (state == 0 and
-                    line.rstrip('\n') and not line.startswith('#')):
-                state = 1
-            elif state == 1 and not line.rstrip('\n'):
-                print('Reshow: true', file=debconfrc_file)
-                state = 2
-            print(line, end="", file=debconfrc_file)
-        orig_debconfrc.close()
+        with open('/etc/debconf.conf') as orig_debconfrc:
+            state = 0
+            for line in orig_debconfrc:
+                if (state == 0 and
+                        line.rstrip('\n') and not line.startswith('#')):
+                    state = 1
+                elif state == 1 and not line.rstrip('\n'):
+                    print('Reshow: true', file=debconfrc_file)
+                    state = 2
+                print(line, end="", file=debconfrc_file)
         debconfrc_file.close()
         os.environ['DEBCONF_SYSTEMRC'] = debconfrc
     else:
@@ -247,17 +243,15 @@ def install(frontend=None, query=False):
     chosen = None
     for f in frontends:
         try:
-            ui = importlib.import_module('ubiquity.frontend.%s' % f)
+            ui = importlib.import_module(f'ubiquity.frontend.{f}')
         except ImportError:
             continue
         chosen = f
-        # Noninteractive implies automatic mode.
-        if f == 'noninteractive':
+        if chosen == 'noninteractive':
             os.environ['UBIQUITY_AUTOMATIC'] = '1'
         break
     else:
-        raise AttributeError('No frontend available; tried %s' %
-                             ', '.join(frontends))
+        raise AttributeError(f"No frontend available; tried {', '.join(frontends)}")
     os.environ['UBIQUITY_FRONTEND'] = chosen
     if query:
         print(os.environ['UBIQUITY_FRONTEND'], file=sys.__stdout__)
@@ -344,7 +338,7 @@ def copy_debconf():
     """Copy a few important questions into the installed system."""
     if not TARGET:
         return
-    targetdb = TARGET + '/var/cache/debconf/config.dat'
+    targetdb = f'{TARGET}/var/cache/debconf/config.dat'
     patterns = ['^oem-config/']
     oem = False
 
@@ -366,14 +360,19 @@ def copy_debconf():
         dccomm.wait()
 
     if not oem:
-        patterns.append('^keyboard-configuration/')
-        patterns.append('^console-setup/')
-
+        patterns.extend(('^keyboard-configuration/', '^console-setup/'))
     for q in patterns:
         misc.execute_root(
-            'debconf-copydb', 'configdb', 'targetdb', '-p', q,
-            '--config=Name:targetdb', '--config=Driver:File',
-            '--config=Mode:0644', '--config=Filename:%s' % targetdb)
+            'debconf-copydb',
+            'configdb',
+            'targetdb',
+            '-p',
+            q,
+            '--config=Name:targetdb',
+            '--config=Driver:File',
+            '--config=Mode:0644',
+            f'--config=Filename:{targetdb}',
+        )
 
 
 def unmount_target():
@@ -384,7 +383,7 @@ def unmount_target():
     with open('/proc/mounts') as mounts:
         for line in mounts:
             source, path, fstype = line.split(' ')[:3]
-            if path == TARGET or path.startswith(TARGET + '/'):
+            if path == TARGET or path.startswith(f'{TARGET}/'):
                 paths.append(path)
                 if fstype == 'zfs':
                     pools.add(source.split('/')[0])
@@ -407,7 +406,7 @@ def unmount_target():
 
 def prepend_path(directory):
     if 'PATH' in os.environ and os.environ['PATH'] != '':
-        os.environ['PATH'] = '%s:%s' % (directory, os.environ['PATH'])
+        os.environ['PATH'] = f"{directory}:{os.environ['PATH']}"
     else:
         os.environ['PATH'] = directory
 
@@ -468,18 +467,19 @@ def acquire_lock():
 def run_oem_hooks(hookdir):
     """Run hook scripts from hookdir."""
 
-    if os.path.isdir(hookdir):
-        # Exclude hooks containing '.', so that *.dpkg-* et al are avoided.
-        hooks = [entry for entry in os.listdir(hookdir) if '.' not in entry]
-        child_env = dict(os.environ)
-        child_env['DEBIAN_FRONTEND'] = 'noninteractive'
-        if 'DEBIAN_HAS_FRONTEND' in child_env:
-            del child_env['DEBIAN_HAS_FRONTEND']
-        for hookentry in hooks:
-            hook = os.path.join(hookdir, hookentry)
-            if os.access(hook, os.X_OK):
-                # Errors are ignored at present, although this may change.
-                subprocess.call([hook], env=child_env)
+    if not os.path.isdir(hookdir):
+        return
+    # Exclude hooks containing '.', so that *.dpkg-* et al are avoided.
+    hooks = [entry for entry in os.listdir(hookdir) if '.' not in entry]
+    child_env = dict(os.environ)
+    child_env['DEBIAN_FRONTEND'] = 'noninteractive'
+    if 'DEBIAN_HAS_FRONTEND' in child_env:
+        del child_env['DEBIAN_HAS_FRONTEND']
+    for hookentry in hooks:
+        hook = os.path.join(hookdir, hookentry)
+        if os.access(hook, os.X_OK):
+            # Errors are ignored at present, although this may change.
+            subprocess.call([hook], env=child_env)
 
 
 def main(oem_config):
@@ -565,8 +565,7 @@ def main(oem_config):
     if options.wireless:
         os.environ['UBIQUITY_WIRELESS'] = '1'
 
-    uid = os.getenv('PKEXEC_UID', False)
-    if uid:
+    if uid := os.getenv('PKEXEC_UID', False):
         # pkexec doesn't set username, but it's used in a few places.
         # fake it from PKEXEC =)
         os.environ['SUDO_USER'] = pwd.getpwuid(int(uid)).pw_name
@@ -583,17 +582,19 @@ def main(oem_config):
     syslog.openlog('ubiquity', syslog.LOG_NOWAIT | syslog.LOG_PID)
 
     if oem_config:
-        syslog.syslog("Ubiquity %s (oem-config)" % VERSION)
+        syslog.syslog(f"Ubiquity {VERSION} (oem-config)")
     else:
-        syslog.syslog("Ubiquity %s" % VERSION)
+        syslog.syslog(f"Ubiquity {VERSION}")
     with open('/var/log/installer/version', 'w') as version_file:
-        print('ubiquity %s' % VERSION, file=version_file)
+        print(f'ubiquity {VERSION}', file=version_file)
 
     if options.autopilot:
         os.environ['UBIQUITY_AUTOPILOT'] = '1'
         with open('/var/log/installer/autopilot', 'w') as autopilot_file:
-            print('DBUS_SESSION_BUS_ADDRESS=%s' %
-                  os.environ['DBUS_SESSION_BUS_ADDRESS'], file=autopilot_file)
+            print(
+                f"DBUS_SESSION_BUS_ADDRESS={os.environ['DBUS_SESSION_BUS_ADDRESS']}",
+                file=autopilot_file,
+            )
             print('UBIQUITY_PID=%i' % os.getpid(), file=autopilot_file)
 
     if 'UBIQUITY_DEBUG' in os.environ:
@@ -615,9 +616,9 @@ def main(oem_config):
             os.close(log)
             sys.stderr = os.fdopen(2, 'a', 1)
             if oem_config:
-                print("Ubiquity %s (oem-config)" % VERSION, file=sys.stderr)
+                print(f"Ubiquity {VERSION} (oem-config)", file=sys.stderr)
             else:
-                print("Ubiquity %s" % VERSION, file=sys.stderr)
+                print(f"Ubiquity {VERSION}", file=sys.stderr)
         except (IOError, OSError) as err:
             if err.errno != errno.EACCES:
                 raise
@@ -632,8 +633,13 @@ def main(oem_config):
     # http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=451130.
     if options.cdebconf:
         for package in ('ubiquity', 'keyboard-configuration', 'console-setup'):
-            subprocess.call(['debconf-loadtemplate', package,
-                             '/var/lib/dpkg/info/%s.templates' % package])
+            subprocess.call(
+                [
+                    'debconf-loadtemplate',
+                    package,
+                    f'/var/lib/dpkg/info/{package}.templates',
+                ]
+            )
 
     # Clean up old state.
     for name in ('apt-installed', 'apt-install-direct', 'remove-kernels',
@@ -659,12 +665,8 @@ def main(oem_config):
 
 
 if __name__ == '__main__':
-    # Are we running as ubiquity or oem-config?
-    oem_config = False
     script_name = os.path.basename(sys.argv[0])
-    if script_name == 'oem-config':
-        oem_config = True
-
+    oem_config = script_name == 'oem-config'
     main(oem_config)
 
 # vim:ai:et:sts=4:tw=80:sw=4:

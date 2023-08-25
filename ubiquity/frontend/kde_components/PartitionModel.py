@@ -24,8 +24,7 @@ class PartitionModel(QtCore.QAbstractItemModel):
 
     def clear(self):
         self.beginResetModel()
-        rootData = []
-        rootData.append(QtCore.QVariant(get_string('partition_column_device')))
+        rootData = [QtCore.QVariant(get_string('partition_column_device'))]
         rootData.append(QtCore.QVariant(get_string('partition_column_type')))
         rootData.append(QtCore.QVariant(
             get_string('partition_column_mountpoint')))
@@ -70,20 +69,18 @@ class PartitionModel(QtCore.QAbstractItemModel):
         if not index.isValid():
             return QtCore.Qt.ItemIsEnabled
 
-        # self.setData(
-        #     index, QtCore.QVariant(QtCore.Qt.Checked),
-        #     QtCore.Qt.CheckStateRole)
-        # return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
-        if index.column() == 3:
-            item = index.internalPointer()
-            if item.formatEnabled():
-                return (QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable |
-                        QtCore.Qt.ItemIsUserCheckable)
-            else:
-                return (QtCore.Qt.ItemIsSelectable |
-                        QtCore.Qt.ItemIsUserCheckable)
-        else:
+        if index.column() != 3:
             return QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
+        item = index.internalPointer()
+        return (
+            (
+                QtCore.Qt.ItemIsEnabled
+                | QtCore.Qt.ItemIsSelectable
+                | QtCore.Qt.ItemIsUserCheckable
+            )
+            if item.formatEnabled()
+            else (QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsUserCheckable)
+        )
 
     def headerData(self, section, orientation, role):
         if (orientation == QtCore.Qt.Horizontal and
@@ -93,13 +90,8 @@ class PartitionModel(QtCore.QAbstractItemModel):
         return QtCore.QVariant()
 
     def index(self, row, column, parent=QtCore.QModelIndex()):
-        if not parent.isValid():
-            parentItem = self.rootItem
-        else:
-            parentItem = parent.internalPointer()
-
-        childItem = parentItem.child(row)
-        if childItem:
+        parentItem = parent.internalPointer() if parent.isValid() else self.rootItem
+        if childItem := parentItem.child(row):
             return self.createIndex(row, column, childItem)
         else:
             return QtCore.QModelIndex()
@@ -117,11 +109,7 @@ class PartitionModel(QtCore.QAbstractItemModel):
         return self.createIndex(parentItem.row(), 0, parentItem)
 
     def rowCount(self, parent):
-        if not parent.isValid():
-            parentItem = self.rootItem
-        else:
-            parentItem = parent.internalPointer()
-
+        parentItem = parent.internalPointer() if parent.isValid() else self.rootItem
         return parentItem.childCount()
 
     def children(self):
@@ -134,10 +122,7 @@ class TreeItem:
         self.itemData = data
         self.childItems = []
         self.controller = controller
-        if controller:
-            self.dbfilter = controller.dbfilter
-        else:
-            self.dbfilter = None
+        self.dbfilter = controller.dbfilter if controller else None
 
     def appendChild(self, item):
         self.childItems.append(item)
@@ -152,10 +137,7 @@ class TreeItem:
         return self.childItems
 
     def columnCount(self):
-        if self.parentItem is None:
-            return len(self.itemData)
-        else:
-            return 5
+        return len(self.itemData) if self.parentItem is None else 5
 
     def data(self, column):
         if self.parentItem is None:
@@ -179,10 +161,7 @@ class TreeItem:
         return self.parentItem
 
     def row(self):
-        if self.parentItem:
-            return self.parentItem.childItems.index(self)
-
-        return 0
+        return self.parentItem.childItems.index(self) if self.parentItem else 0
 
     def partman_column_name(self):
         partition = self.itemData[1]
@@ -190,13 +169,13 @@ class TreeItem:
             # whole disk
             return partition['device']
         elif partition['parted']['fs'] != 'free':
-            return '  %s' % partition['parted']['path']
+            return f"  {partition['parted']['path']}"
         elif partition['parted']['type'] == 'unusable':
-            return '  %s' % get_string('partman/text/unusable')
+            return f"  {get_string('partman/text/unusable')}"
         else:
             # partman uses "FREE SPACE" which feels a bit too SHOUTY for
             # this interface.
-            return '  %s' % get_string('partition_free_space')
+            return f"  {get_string('partition_free_space')}"
 
     def partman_column_type(self):
         partition = self.itemData[1]
@@ -256,11 +235,10 @@ class TreeItem:
         partition = self.itemData[1]
         if 'id' not in partition:
             return ''
-        else:
-            # Yes, I know, 1000000 bytes is annoying. Sorry. This is what
-            # partman expects.
-            size_mb = int(partition['parted']['size']) // 1000000
-            return '%d MB' % size_mb
+        # Yes, I know, 1000000 bytes is annoying. Sorry. This is what
+        # partman expects.
+        size_mb = int(partition['parted']['size']) // 1000000
+        return '%d MB' % size_mb
 
     def partman_column_used(self):
         partition = self.itemData[1]

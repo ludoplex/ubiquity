@@ -17,7 +17,7 @@ from ubiquity.frontend.gtk_components import nmwidgets
 
 class MockController(object):
     def get_string(self, name, lang=None, prefix=None):
-        return "%s: %s" % (lang, name)
+        return f"{lang}: {name}"
 
 
 class WidgetTests(unittest.TestCase):

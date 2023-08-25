@@ -110,7 +110,7 @@ def get_all_interfaces():
         ifs_file.readline()
 
         for line in ifs_file:
-            name = re.match(r'(.*?(?::\d+)?):', line.strip()).group(1)
+            name = re.match(r'(.*?(?::\d+)?):', line.strip())[1]
             if name == 'lo':
                 continue
             ifs.append(name)
@@ -132,7 +132,7 @@ exit 101""", file=f)
 
     start_stop_daemon = os.path.join(target, 'sbin/start-stop-daemon')
     if os.path.exists(start_stop_daemon):
-        os.rename(start_stop_daemon, '%s.REAL' % start_stop_daemon)
+        os.rename(start_stop_daemon, f'{start_stop_daemon}.REAL')
     with open(start_stop_daemon, 'w') as f:
         print("""\
 #!/bin/sh
@@ -143,7 +143,7 @@ exit 0""", file=f)
 
     initctl = os.path.join(target, 'sbin/initctl')
     if os.path.exists(initctl):
-        os.rename(initctl, '%s.REAL' % initctl)
+        os.rename(initctl, f'{initctl}.REAL')
         with open(initctl, 'w') as f:
             print("""\
 #!/bin/sh
@@ -162,8 +162,7 @@ exit 0""", file=f)
 
     if x11 and 'DISPLAY' in os.environ:
         if 'SUDO_USER' in os.environ:
-            xauthority = os.path.expanduser('~%s/.Xauthority' %
-                                            os.environ['SUDO_USER'])
+            xauthority = os.path.expanduser(f"~{os.environ['SUDO_USER']}/.Xauthority")
         else:
             xauthority = os.path.expanduser('~/.Xauthority')
         if os.path.exists(xauthority):
@@ -196,12 +195,12 @@ def chroot_cleanup(target, x11=False):
     misc.execute('umount', os.path.join(target, 'dev'))
 
     initctl = os.path.join(target, 'sbin/initctl')
-    if os.path.exists('%s.REAL' % initctl):
-        os.rename('%s.REAL' % initctl, initctl)
+    if os.path.exists(f'{initctl}.REAL'):
+        os.rename(f'{initctl}.REAL', initctl)
 
     start_stop_daemon = os.path.join(target, 'sbin/start-stop-daemon')
-    if os.path.exists('%s.REAL' % start_stop_daemon):
-        os.rename('%s.REAL' % start_stop_daemon, start_stop_daemon)
+    if os.path.exists(f'{start_stop_daemon}.REAL'):
+        os.rename(f'{start_stop_daemon}.REAL', start_stop_daemon)
     else:
         osextras.unlink_force(start_stop_daemon)
 
@@ -231,10 +230,9 @@ def query_recorded_installed():
     all_removed = apt_removed | apt_removed_recursive
     if apt_installed & all_removed:
         syslog.syslog(
-            'Refusing to install %s: marked to be removed later on, so this '
-            'would be redundant.' % (apt_installed & all_removed))
-    apt_installed = apt_installed - all_removed
-    return apt_installed
+            f'Refusing to install {apt_installed & all_removed}: marked to be removed later on, so this would be redundant.'
+        )
+    return apt_installed - all_removed
 
 
 def record_removed(pkgs, recursive=False):
@@ -400,10 +398,9 @@ class DebconfInstallProgress(InstallProgress):
         # debconf questions they might ask.
         saved_environ_keys = ('DEBIAN_FRONTEND', 'DEBIAN_HAS_FRONTEND',
                               'DEBCONF_USE_CDEBCONF')
-        saved_environ = {}
-        for key in saved_environ_keys:
-            if key in os.environ:
-                saved_environ[key] = os.environ[key]
+        saved_environ = {
+            key: os.environ[key] for key in saved_environ_keys if key in os.environ
+        }
         os.environ['DEBIAN_FRONTEND'] = 'noninteractive'
         if 'DEBIAN_HAS_FRONTEND' in os.environ:
             del os.environ['DEBIAN_HAS_FRONTEND']
@@ -488,18 +485,14 @@ def archdetect():
 
 def is_secure_boot():
     try:
-        secureboot = ''
         secureboot_efivar = subprocess.Popen(
             ['od', '-An', '-t', 'u1',
              os.path.join('/sys/firmware/efi/efivars',
                           'SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c')],
             stdout=subprocess.PIPE, universal_newlines=True)
         answer = secureboot_efivar.communicate()[0].strip()
-        if answer is not None:
-            secureboot = answer.split(' ')[-1]
-        if len(secureboot) > 0:
-            return (int(secureboot) == 1)
-        return False
+        secureboot = answer.split(' ')[-1] if answer is not None else ''
+        return (int(secureboot) == 1) if len(secureboot) > 0 else False
     except Exception:
         return False
 
@@ -763,13 +756,13 @@ def remove_target(source_root, target_root, relpath, st_source):
     # We're installing a non-directory over an existing non-empty directory,
     # and we have no better strategy.  Move the existing directory to a
     # backup location.
-    backuppath = targetpath + '.bak'
+    backuppath = f'{targetpath}.bak'
     while True:
         if not os.path.exists(backuppath):
             os.rename(targetpath, backuppath)
             break
         else:
-            backuppath = backuppath + '.bak'
+            backuppath = f'{backuppath}.bak'
 
 
 def copy_file(db, sourcepath, targetpath, md5_check):
@@ -794,26 +787,23 @@ def copy_file(db, sourcepath, targetpath, md5_check):
             if md5_check:
                 targethash = hashlib.md5()
             while True:
-                buf = targetfh.read(16 * 1024)
-                if not buf:
-                    break
-                targethash.update(buf)
+                if buf := targetfh.read(16 * 1024):
+                    targethash.update(buf)
 
-        if targethash.digest() != sourcehash.digest():
-            error_template = 'ubiquity/install/copying_error/md5'
-            db.subst(error_template, 'FILE', targetpath)
-            db.input('critical', error_template)
-            db.go()
-            response = db.get(error_template)
-            if response == 'skip':
-                break
-            elif response == 'abort':
-                syslog.syslog(syslog.LOG_ERR, 'MD5 failure on %s' % targetpath)
-                sys.exit(3)
-            elif response == 'retry':
-                pass
-        else:
+                else:
+                    break
+        if targethash.digest() == sourcehash.digest():
             break
+        error_template = 'ubiquity/install/copying_error/md5'
+        db.subst(error_template, 'FILE', targetpath)
+        db.input('critical', error_template)
+        db.go()
+        response = db.get(error_template)
+        if response == 'skip':
+            break
+        elif response == 'abort':
+            syslog.syslog(syslog.LOG_ERR, f'MD5 failure on {targetpath}')
+            sys.exit(3)
 
 
 class InstallBase:
@@ -827,7 +817,7 @@ class InstallBase:
 
     def warn_broken_packages(self, pkgs, err):
         pkgs = ', '.join(pkgs)
-        syslog.syslog('broken packages after installation: %s' % pkgs)
+        syslog.syslog(f'broken packages after installation: {pkgs}')
         self.db.subst('ubiquity/install/broken_install', 'ERROR', err)
         self.db.subst('ubiquity/install/broken_install', 'PACKAGES', pkgs)
         self.db.input('critical', 'ubiquity/install/broken_install')
@@ -887,7 +877,7 @@ class InstallBase:
                         if arch == 'all':
                             fullname = name
                         else:
-                            fullname = '%s:%s' % (name, arch)
+                            fullname = f'{name}:{arch}'
                             # This syntax only works on systems configured
                             # for multiarch, so check and fall back to the
                             # single-architecture syntax.
@@ -895,9 +885,7 @@ class InstallBase:
                                 fullname = name
                         candidate = cache[fullname].versions[version]
                     except (KeyError, ValueError) as e:
-                        syslog.syslog(
-                            'Failed to find package object for %s: %s' %
-                            (item.destfile, e))
+                        syslog.syslog(f'Failed to find package object for {item.destfile}: {e}')
                         continue
 
                     if candidate.sha256 is not None:
@@ -907,9 +895,8 @@ class InstallBase:
                         if sha256.hexdigest() != candidate.sha256:
                             osextras.unlink_force(item.destfile)
                             raise IOError(
-                                "%s SHA256 checksum mismatch: %s != %s" %
-                                (item.destfile, sha256.hexdigest(),
-                                 candidate.sha256))
+                                f"{item.destfile} SHA256 checksum mismatch: {sha256.hexdigest()} != {candidate.sha256}"
+                            )
             syslog.syslog('Downloads verified successfully')
 
             # then install
@@ -918,9 +905,7 @@ class InstallBase:
                 break
             elif res == pm.RESULT_FAILED:
                 raise SystemError("installArchives() failed")
-            elif res == pm.RESULT_INCOMPLETE:
-                pass
-            else:
+            elif res != pm.RESULT_INCOMPLETE:
                 raise SystemError("internal-error: unknown result code "
                                   "from InstallArchives: %s" % res)
             # reload the fetcher for media swapping
@@ -975,26 +960,25 @@ class InstallBase:
             chroot_setup(self.target)
             commit_error = None
             try:
-                try:
-                    if not self.commit_with_verify(
-                            cache, fetchprogress, installprogress):
-                        fetchprogress.stop()
-                        installprogress.finish_update()
-                        self.db.progress('STOP')
-                        self.nested_progress_end()
-                        return
-                except IOError:
-                    for line in traceback.format_exc().split('\n'):
-                        syslog.syslog(syslog.LOG_ERR, line)
+                if not self.commit_with_verify(
+                        cache, fetchprogress, installprogress):
                     fetchprogress.stop()
                     installprogress.finish_update()
                     self.db.progress('STOP')
                     self.nested_progress_end()
                     return
-                except SystemError as e:
-                    for line in traceback.format_exc().split('\n'):
-                        syslog.syslog(syslog.LOG_ERR, line)
-                    commit_error = str(e)
+            except IOError:
+                for line in traceback.format_exc().split('\n'):
+                    syslog.syslog(syslog.LOG_ERR, line)
+                fetchprogress.stop()
+                installprogress.finish_update()
+                self.db.progress('STOP')
+                self.nested_progress_end()
+                return
+            except SystemError as e:
+                for line in traceback.format_exc().split('\n'):
+                    syslog.syslog(syslog.LOG_ERR, line)
+                commit_error = str(e)
             finally:
                 if "mint-meta-codecs" in to_install:
                     os.system("echo 'DEBIAN_FRONTEND=noninteractive apt-get install --yes mint-meta-codecs' > /target/usr/bin/install-mint-codecs")
@@ -1019,8 +1003,7 @@ class InstallBase:
         try:
             keep_packages = self.db.get('ubiquity/keep-installed')
             keep_packages = keep_packages.replace(',', '').split()
-            syslog.syslog('keeping packages due to preseeding: %s' %
-                          ' '.join(keep_packages))
+            syslog.syslog(f"keeping packages due to preseeding: {' '.join(keep_packages)}")
             record_installed(keep_packages)
         except debconf.DebconfError:
             pass
@@ -1060,7 +1043,7 @@ class InstallBase:
             with open(no_install, 'a'):
                 os.utime(no_install, None)
 
-        syslog.syslog('keeping language packs for: %s' % ' '.join(langpacks))
+        syslog.syslog(f"keeping language packs for: {' '.join(langpacks)}")
 
         try:
             lppatterns = self.db.get('pkgsel/language-pack-patterns').split()
@@ -1077,10 +1060,9 @@ class InstallBase:
             # all. We install these almost unconditionally; if you want to
             # get rid of even these, you can preseed pkgsel/language-packs
             # to the empty string.
-            to_install.append('language-pack-%s' % lp)
+            to_install.append(f'language-pack-{lp}')
             # Other language packs, typically selected by preseeding.
-            for pattern in lppatterns:
-                to_install.append(pattern.replace('$LL', lp))
+            to_install.extend(pattern.replace('$LL', lp) for pattern in lppatterns)
             # More extensive language support packages.
             # If pkgsel/language-packs is ALL, then speed things up by
             # calling check-language-support just once.
@@ -1091,13 +1073,13 @@ class InstallBase:
                     stdout=subprocess.PIPE, universal_newlines=True)
                 to_install.extend(check_lang.communicate()[0].strip().split())
             else:
-                to_install.append('language-support-%s' % lp)
+                to_install.append(f'language-support-{lp}')
             if checker:
                 # Keep language-support-$LL installed if it happens to be in
                 # the live filesystem, since there's no point spending time
                 # removing it; but don't install it if it isn't in the live
                 # filesystem.
-                toplevel = 'language-support-%s' % lp
+                toplevel = f'language-support-{lp}'
                 toplevel_pkg = get_cache_pkg(cache, toplevel)
                 if toplevel_pkg and toplevel_pkg.is_installed:
                     to_install.append(toplevel)
@@ -1117,7 +1099,7 @@ class InstallBase:
         install_new = True
         try:
             install_new_key = \
-                self.db.get('pkgsel/install-language-support') == 'true'
+                    self.db.get('pkgsel/install-language-support') == 'true'
             if install_new_key != '' and not misc.create_bool(install_new_key):
                 install_new = False
         except debconf.DebconfError:
@@ -1149,14 +1131,13 @@ class InstallBase:
         if os.path.exists(langpacks_file):
             osextras.unlink_force(langpacks_file)
         if install_new:
-            if save:
-                if not os.path.exists(os.path.dirname(langpacks_file)):
-                    os.makedirs(os.path.dirname(langpacks_file))
-                with open(langpacks_file, 'w') as langpacks:
-                    for pkg in to_install:
-                        print(pkg, file=langpacks)
-                return []
-            else:
+            if not save:
                 return to_install
+            if not os.path.exists(os.path.dirname(langpacks_file)):
+                os.makedirs(os.path.dirname(langpacks_file))
+            with open(langpacks_file, 'w') as langpacks:
+                for pkg in to_install:
+                    print(pkg, file=langpacks)
+            return []
 
 # vim:ai:et:sts=4:tw=80:sw=4:

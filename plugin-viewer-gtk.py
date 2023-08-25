@@ -28,7 +28,7 @@ class MockController(object):
         self.parent.button_next.clicked()
 
     def get_string(self, s, lang):
-        return "get_string: %s (lang=%s)" % (s, lang)
+        return f"get_string: {s} (lang={lang})"
 
     def add_builder(self, builder):
         pass

@@ -126,7 +126,7 @@ def update(frontend):
         updates = [pkg for pkg in UBIQUITY_PKGS
                    if pkg in cache and cache[pkg].is_upgradable]
     except IOError as e:
-        print("ERROR: cache.update() returned: '%s'" % e)
+        print(f"ERROR: cache.update() returned: '{e}'")
         updates = []
 
     if not updates:
@@ -158,13 +158,12 @@ def update(frontend):
             cache.commit(AcquireProgressDebconfProgressAdapter(frontend),
                          InstallProgressDebconfProgressAdapter(frontend))
         except (SystemError, IOError) as e:
-            syslog.syslog(syslog.LOG_ERR,
-                          "Error installing the update: '%s'" % e)
+            syslog.syslog(syslog.LOG_ERR, f"Error installing the update: '{e}'")
             title = frontend.get_string('error_updating_installer')
             if frontend.locale is None:
                 extended_locale = 'extended:c'
             else:
-                extended_locale = 'extended:%s' % frontend.locale
+                extended_locale = f'extended:{frontend.locale}'
             msg = frontend.get_string('error_updating_installer',
                                       extended_locale)
             msg = msg.replace('${ERROR}', str(e))

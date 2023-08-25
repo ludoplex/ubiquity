@@ -99,9 +99,7 @@ class Install(install_misc.InstallBase):
         self.langpacks = []
         if os.path.exists('/var/lib/ubiquity/langpacks'):
             with open('/var/lib/ubiquity/langpacks') as langpacks:
-                for line in langpacks:
-                    self.langpacks.append(line.strip())
-
+                self.langpacks.extend(line.strip() for line in langpacks)
         # Load plugins
         modules = plugin_manager.load_plugins()
         modules = plugin_manager.order_plugins(modules)
@@ -142,7 +140,7 @@ class Install(install_misc.InstallBase):
         apt_pkg.config.set("Acquire::cdrom::AutoDetect", "false")
         apt_pkg.config.set("Dir::Media::MountPath", "/cdrom")
 
-        apt_pkg.config.set("DPkg::Options::", "--root=%s" % self.target)
+        apt_pkg.config.set("DPkg::Options::", f"--root={self.target}")
         # We don't want apt-listchanges or dpkg-preconfigure, so just clear
         # out the list of pre-installation hooks.
         apt_pkg.config.clear("DPkg::Pre-Install-Pkgs")
@@ -165,10 +163,7 @@ class Install(install_misc.InstallBase):
     def run(self):
         """Main entry point."""
         # We pick up where install.py left off.
-        if 'UBIQUITY_OEM_USER_CONFIG' in os.environ:
-            self.prev_count = 0
-        else:
-            self.prev_count = 74
+        self.prev_count = 0 if 'UBIQUITY_OEM_USER_CONFIG' in os.environ else 74
         self.count = self.prev_count
         self.start = self.prev_count
         self.end = self.start + 22 + len(self.plugins)
@@ -287,7 +282,7 @@ class Install(install_misc.InstallBase):
         # Fix /etc/crypttab
         crypttab_file = self.target_file("etc/crypttab")
         if os.path.exists(crypttab_file):
-            os.system("sed -i 's@/target/@/@g' %s" % crypttab_file)
+            os.system(f"sed -i 's@/target/@/@g' {crypttab_file}")
 
         # Fix Grub title
         install_misc.chrex(self.target, '/usr/share/ubuntu-system-adjustments/systemd/adjust-grub-title')
@@ -333,17 +328,23 @@ class Install(install_misc.InstallBase):
         for python in python_installed:
             re_file = re.compile(r'^/usr/lib/%s/.*\.py$' % python)
             files = [
-                f for f in cache['%s-minimal' % python].installed_files
-                if (re_file.match(f) and
-                    not os.path.exists(self.target_file('%sc' % f[1:])))]
-            install_misc.chrex(self.target, python,
-                               '/usr/lib/%s/py_compile.py' % python, *files)
+                f
+                for f in cache[f'{python}-minimal'].installed_files
+                if re_file.match(f)
+                and not os.path.exists(self.target_file(f'{f[1:]}c'))
+            ]
+            install_misc.chrex(
+                self.target, python, f'/usr/lib/{python}/py_compile.py', *files
+            )
             files = [
-                f for f in cache[python].installed_files
-                if (re_file.match(f) and
-                    not os.path.exists(self.target_file('%sc' % f[1:])))]
-            install_misc.chrex(self.target, python,
-                               '/usr/lib/%s/py_compile.py' % python, *files)
+                f
+                for f in cache[python].installed_files
+                if re_file.match(f)
+                and not os.path.exists(self.target_file(f'{f[1:]}c'))
+            ]
+            install_misc.chrex(
+                self.target, python, f'/usr/lib/{python}/py_compile.py', *files
+            )
 
         # Modules provided by the core Debian Python packages.
         default = subprocess.Popen(
@@ -373,7 +374,7 @@ class Install(install_misc.InstallBase):
                     universal_newlines=True).communicate()[0].rstrip('\n')
                 for python in supported.split():
                     try:
-                        cachedpython = cache['%s-minimal' % python]
+                        cachedpython = cache[f'{python}-minimal']
                     except KeyError:
                         continue
                     if not cachedpython.is_installed:
@@ -395,7 +396,7 @@ class Install(install_misc.InstallBase):
                     universal_newlines=True).communicate()[0].rstrip('\n')
                 for python in supported.split():
                     try:
-                        cachedpython = cache['%s-minimal' % python]
+                        cachedpython = cache[f'{python}-minimal']
                     except KeyError:
                         continue
                     if not cachedpython.is_installed:
@@ -448,7 +449,7 @@ class Install(install_misc.InstallBase):
             domain = self.db.get('netcfg/get_domain').rstrip('.')
         except debconf.DebconfError:
             domain = ''
-        if hostname == '':
+        if not hostname:
             hostname = 'mint'
 
         with open(self.target_file('etc/hosts'), 'w') as hosts:
@@ -467,7 +468,7 @@ class Install(install_misc.InstallBase):
             print(hostname, file=fp)
 
         if 'UBIQUITY_OEM_USER_CONFIG' in os.environ:
-            os.system("hostname %s" % hostname)
+            os.system(f"hostname {hostname}")
 
         persistent_net = '/etc/udev/rules.d/70-persistent-net.rules'
         if os.path.exists(persistent_net):
@@ -481,10 +482,10 @@ class Install(install_misc.InstallBase):
         # set a generic info message in case plugin doesn't provide one
         self.db.progress('INFO', 'ubiquity/install/title')
         inst = plugin.Install(None, db=self.db)
-        ret = inst.install(self.target, PluginProgress(self.db))
-        if ret:
+        if ret := inst.install(self.target, PluginProgress(self.db)):
             raise install_misc.InstallStepError(
-                "Plugin %s failed with code %s" % (plugin.NAME, ret))
+                f"Plugin {plugin.NAME} failed with code {ret}"
+            )
 
     def configure_locale(self):
         """Configure the locale by running the language plugin.
@@ -613,7 +614,7 @@ class Install(install_misc.InstallBase):
             self.db.progress('INFO', 'ubiquity/install/target_hooks')
             for hookentry in hooks:
                 hook = os.path.join(hookdir, hookentry)
-                syslog.syslog('running %s' % hook)
+                syslog.syslog(f'running {hook}')
                 if not os.access(hook, os.X_OK):
                     self.db.progress('STEP', 1)
                     continue
@@ -646,14 +647,14 @@ class Install(install_misc.InstallBase):
                 continue
             cachedpkg = install_misc.get_cache_pkg(cache, pkg)
             if cachedpkg is None or not cachedpkg.is_installed:
-                syslog.syslog('incomplete language support: %s missing' % pkg)
+                syslog.syslog(f'incomplete language support: {pkg} missing')
                 incomplete = True
                 break
         if incomplete:
             language_support_dir = \
-                self.target_file('usr/share/language-support')
+                    self.target_file('usr/share/language-support')
             update_notifier_dir = \
-                self.target_file('var/lib/update-notifier/user.d')
+                    self.target_file('var/lib/update-notifier/user.d')
             for note in ('incomplete-language-support-gnome.note',
                          'incomplete-language-support-qt.note'):
                 notepath = os.path.join(language_support_dir, note)
@@ -716,8 +717,7 @@ class Install(install_misc.InstallBase):
                     elif kernel.startswith('linux-'):
                         # Traverse dependencies to find the real kernel image.
                         cache = Cache()
-                        kernel = self.traverse_for_kernel(cache, kernel)
-                        if kernel:
+                        if kernel := self.traverse_for_kernel(cache, kernel):
                             new_kernel_pkg = kernel
                             new_kernel_version = kernel[12:]
             install_kernels_file.close()
@@ -729,7 +729,7 @@ class Install(install_misc.InstallBase):
                 for line in remove_kernels_file:
                     remove_kernels.add(line.strip())
 
-        if len(install_kernels) == 0 and len(remove_kernels) == 0:
+        if not install_kernels and not remove_kernels:
             self.db.progress('STOP')
             return
 
@@ -784,7 +784,7 @@ class Install(install_misc.InstallBase):
         self.db.progress('INFO', 'ubiquity/install/hardware')
 
         script = '/usr/lib/ubiquity/debian-installer-utils' \
-                 '/register-module.post-base-installer'
+                     '/register-module.post-base-installer'
         if 'UBIQUITY_OEM_USER_CONFIG' in os.environ:
             script += '-oem'
         misc.execute(script)
@@ -819,9 +819,7 @@ class Install(install_misc.InstallBase):
         except OSError:
             pass
 
-        packages = ['linux-image-' + self.kernel_version,
-                    'libpaper1',
-                    'ssl-cert']
+        packages = [f'linux-image-{self.kernel_version}', 'libpaper1', 'ssl-cert']
         arch, subarch = install_misc.archdetect()
 
         try:
@@ -873,11 +871,11 @@ class Install(install_misc.InstallBase):
         for entry in os.listdir(bootdir):
             match = re_image.match(entry)
             if match is not None:
-                imagetype = match.group(1)
+                imagetype = match[1]
                 linksrc = os.path.join(linkprefix, entry)
                 linkdst = os.path.join(linkdir, imagetype)
                 if os.path.exists(linkdst):
-                    if entry.endswith('-' + self.kernel_version):
+                    if entry.endswith(f'-{self.kernel_version}'):
                         os.unlink(linkdst)
                     else:
                         continue
@@ -911,7 +909,10 @@ class Install(install_misc.InstallBase):
 
         if not dev:
             syslog.syslog(syslog.LOG_ERR, ' '.join(args))
-            syslog.syslog(syslog.LOG_ERR, 'determining crypto device failed. Output: %s' % lsblk_out)
+            syslog.syslog(
+                syslog.LOG_ERR,
+                f'determining crypto device failed. Output: {lsblk_out}',
+            )
             self.clean_crypto_keys()
             self.db.input('critical', 'ubiquity/install/broken_luks_add_key')
             self.db.go()
@@ -920,12 +921,11 @@ class Install(install_misc.InstallBase):
 
         key_args = "%s\n%s" % (crypto_key, recovery_key)
         try:
-            log_args = ['log-output', '-t', 'ubiquity']
-            log_args.extend(['cryptsetup', 'luksAddKey', dev])
+            log_args = ['log-output', '-t', 'ubiquity', *['cryptsetup', 'luksAddKey', dev]]
             p = subprocess.run(log_args, input=key_args, encoding="utf-8")
         except subprocess.CalledProcessError as e:
             syslog.syslog(syslog.LOG_ERR, ' '.join(log_args))
-            syslog.syslog(syslog.LOG_ERR, "cryptsetup failed(%s): %s" % (e.returncode, e.output))
+            syslog.syslog(syslog.LOG_ERR, f"cryptsetup failed({e.returncode}): {e.output}")
             return
         finally:
             self.clean_crypto_keys()
@@ -949,11 +949,10 @@ class Install(install_misc.InstallBase):
             # recopy translations if we have them now
             full_lang = self.db.get('debian-installer/locale').split('.')[0]
             for lang in [full_lang.split('.')[0], full_lang.split('_')[0]]:
-                source = (
-                    '/usr/share/locale-langpack/%s/LC_MESSAGES/grub.mo' % lang)
+                source = f'/usr/share/locale-langpack/{lang}/LC_MESSAGES/grub.mo'
                 if (os.path.exists(source) and
                         os.path.isdir('/boot/grub/locale')):
-                    shutil.copy(source, '/boot/grub/locale/%s.mo' % lang)
+                    shutil.copy(source, f'/boot/grub/locale/{lang}.mo')
                     break
             return
 
@@ -967,41 +966,40 @@ class Install(install_misc.InstallBase):
             arch, subarch = install_misc.archdetect()
 
             try:
-                if arch in ('amd64', 'arm64', 'i386'):
-                    from ubiquity.components import grubinstaller
-                    while 1:
-                        dbfilter = grubinstaller.GrubInstaller(None, self.db)
-                        ret = dbfilter.run_command(auto_process=True)
-                        if subarch == 'efi' and ret != 0:
-                            raise install_misc.InstallStepError(
-                                "GrubInstaller failed with code %d" % ret)
-                        elif ret != 0:
-                            old_bootdev = self.db.get('grub-installer/bootdev')
-                            bootdev = 'ubiquity/install/new-bootdev'
-                            self.db.fset(bootdev, 'seen', 'false')
-                            self.db.set(bootdev, old_bootdev)
-                            self.db.input('critical', bootdev)
-                            self.db.go()
-                            response = self.db.get(bootdev)
-                            if response == 'skip':
-                                break
-                            if not response:
-                                raise install_misc.InstallStepError(
-                                    "GrubInstaller failed with code %d" % ret)
-                            else:
-                                self.db.set('grub-installer/bootdev', response)
-                        else:
-                            break
-                    if arch == 'amd64' and subarch != 'efi' and os.path.ismount("/target/boot/efi"):
-                        dbfilter = grubinstaller.GrubInstaller(
-                            None, self.db, extra_args=['amd64/efi'])
-                        ret = dbfilter.run_command(auto_process=True)
-                        if ret != 0:
-                            raise install_misc.InstallStepError(
-                                "GrubInstaller failed with code %d" % ret)
-                else:
+                if arch not in ('amd64', 'arm64', 'i386'):
                     raise install_misc.InstallStepError(
                         "No bootloader installer found")
+                from ubiquity.components import grubinstaller
+                while 1:
+                    dbfilter = grubinstaller.GrubInstaller(None, self.db)
+                    ret = dbfilter.run_command(auto_process=True)
+                    if subarch == 'efi' and ret != 0:
+                        raise install_misc.InstallStepError(
+                            "GrubInstaller failed with code %d" % ret)
+                    elif ret != 0:
+                        old_bootdev = self.db.get('grub-installer/bootdev')
+                        bootdev = 'ubiquity/install/new-bootdev'
+                        self.db.fset(bootdev, 'seen', 'false')
+                        self.db.set(bootdev, old_bootdev)
+                        self.db.input('critical', bootdev)
+                        self.db.go()
+                        response = self.db.get(bootdev)
+                        if response == 'skip':
+                            break
+                        if not response:
+                            raise install_misc.InstallStepError(
+                                "GrubInstaller failed with code %d" % ret)
+                        else:
+                            self.db.set('grub-installer/bootdev', response)
+                    else:
+                        break
+                if arch == 'amd64' and subarch != 'efi' and os.path.ismount("/target/boot/efi"):
+                    dbfilter = grubinstaller.GrubInstaller(
+                        None, self.db, extra_args=['amd64/efi'])
+                    ret = dbfilter.run_command(auto_process=True)
+                    if ret != 0:
+                        raise install_misc.InstallStepError(
+                            "GrubInstaller failed with code %d" % ret)
             except ImportError:
                 raise install_misc.InstallStepError(
                     "No bootloader installer found")
@@ -1011,8 +1009,7 @@ class Install(install_misc.InstallBase):
 
     def configure_zsys(self):
         """ Configure zsys """
-        use_zfs = self.db.get('ubiquity/use_zfs')
-        if use_zfs:
+        if use_zfs := self.db.get('ubiquity/use_zfs'):
             misc.execute_root('/usr/share/ubiquity/zsys-setup', 'finalize')
 
     def configure_active_directory(self):
@@ -1061,19 +1058,32 @@ class Install(install_misc.InstallBase):
 
     def join_domain(self, hostname, directory_domain, directory_user, directory_passwd):
         """ Join an Active Directory domain """
-        log_args = ['log-output', '-t', 'ubiquity']
-        log_args.extend(['realm', 'join', '--install', self.target,
-                         '--user', directory_user, '--computer-name', hostname,
-                         '--unattended', directory_domain])
+        log_args = [
+            'log-output',
+            '-t',
+            'ubiquity',
+            *[
+                'realm',
+                'join',
+                '--install',
+                self.target,
+                '--user',
+                directory_user,
+                '--computer-name',
+                hostname,
+                '--unattended',
+                directory_domain,
+            ],
+        ]
         try:
             p = subprocess.run(log_args, input=directory_passwd, timeout=60, encoding="utf-8")
         except TimeoutError as e:
             syslog.syslog(syslog.LOG_ERR, ' '.join(log_args))
-            syslog.syslog(syslog.LOG_ERR, "Command timed out(%s): %s" % (e.errno, e.strerror))
+            syslog.syslog(syslog.LOG_ERR, f"Command timed out({e.errno}): {e.strerror}")
             return False
         except IOError as e:
             syslog.syslog(syslog.LOG_ERR, ' '.join(log_args))
-            syslog.syslog(syslog.LOG_ERR, "OS error(%s): %s" % (e.errno, e.strerror))
+            syslog.syslog(syslog.LOG_ERR, f"OS error({e.errno}): {e.strerror}")
             return False
 
         if p.returncode != 0:
@@ -1134,7 +1144,7 @@ class Install(install_misc.InstallBase):
         with cache.actiongroup():
             for cachedpkg in cache:
                 if cachedpkg.is_auto_removable and not cachedpkg.marked_delete:
-                    syslog.syslog("Autopurge %s" % cachedpkg.name)
+                    syslog.syslog(f"Autopurge {cachedpkg.name}")
                     cachedpkg.mark_delete(auto_fix=False, purge=True)
 
         self.db.progress('SET', 1)
@@ -1148,17 +1158,16 @@ class Install(install_misc.InstallBase):
         install_misc.chroot_setup(self.target)
         commit_error = None
         try:
-            try:
-                if not cache.commit(fetchprogress, installprogress):
-                    fetchprogress.stop()
-                    installprogress.finish_update()
-                    self.db.progress('STOP')
-                    self.nested_progress_end()
-                    return
-            except SystemError as e:
-                for line in traceback.format_exc().split('\n'):
-                    syslog.syslog(syslog.LOG_ERR, line)
-                commit_error = str(e)
+            if not cache.commit(fetchprogress, installprogress):
+                fetchprogress.stop()
+                installprogress.finish_update()
+                self.db.progress('STOP')
+                self.nested_progress_end()
+                return
+        except SystemError as e:
+            for line in traceback.format_exc().split('\n'):
+                syslog.syslog(syslog.LOG_ERR, line)
+            commit_error = str(e)
         finally:
             install_misc.chroot_cleanup(self.target)
         self.db.progress('SET', 5)
@@ -1185,7 +1194,7 @@ class Install(install_misc.InstallBase):
         """Try to install additional packages requested by the distributor."""
         try:
             inst_langpacks = \
-                self.db.get('oem-config/install-language-support') == 'true'
+                    self.db.get('oem-config/install-language-support') == 'true'
         except debconf.DebconfError:
             inst_langpacks = False
         if inst_langpacks:
@@ -1234,7 +1243,7 @@ class Install(install_misc.InstallBase):
                     print(extra_pool, file=f)
             if extra_key and os.path.exists(extra_key):
                 if os.path.exists(trusted_db):
-                    shutil.copy(trusted_db, trusted_db + '.oem-config')
+                    shutil.copy(trusted_db, f'{trusted_db}.oem-config')
                 subprocess.call(['apt-key', 'add', extra_key])
             if extra_pool:
                 subprocess.call(apt_update)
@@ -1255,8 +1264,8 @@ class Install(install_misc.InstallBase):
                     brokenpkgs = install_misc.broken_packages(cache)
                     self.warn_broken_packages(brokenpkgs, str(e))
         finally:
-            if os.path.exists(trusted_db + '.oem-config'):
-                shutil.copy(trusted_db + '.oem-config', trusted_db)
+            if os.path.exists(f'{trusted_db}.oem-config'):
+                shutil.copy(f'{trusted_db}.oem-config', trusted_db)
             if os.path.exists(custom):
                 os.unlink(custom)
                 subprocess.call(apt_update)
@@ -1321,7 +1330,9 @@ class Install(install_misc.InstallBase):
                 with open('/run/ubuntu-drivers-oem.autoinstall', 'r') as f:
                     oem_pkgs = set(f.read().splitlines())
                     for oem_pkg in sorted(oem_pkgs):
-                        target_sources_list = self.target_file("etc/apt/sources.list.d/{}.list".format(oem_pkg))
+                        target_sources_list = self.target_file(
+                            f"etc/apt/sources.list.d/{oem_pkg}.list"
+                        )
                         if not os.path.exists(target_sources_list):
                             continue
 
@@ -1329,7 +1340,7 @@ class Install(install_misc.InstallBase):
                             cache.update(sources_list=target_sources_list)
                             cache.open()
                         except FetchFailedException:
-                            syslog.syslog("Failed to apt update {}".format(target_sources_list))
+                            syslog.syslog(f"Failed to apt update {target_sources_list}")
                             oem_pkgs.discard(oem_pkg)
                     if oem_pkgs:
                         # An ordered list from the set() to avoid the random dependencies failure.
@@ -1353,9 +1364,7 @@ class Install(install_misc.InstallBase):
                         pass
 
                     apps_dir = 'usr/share/applications'
-                    for desktop_file in (
-                            apps_dir + '/oem-config-prepare-gtk.desktop',
-                            apps_dir + '/kde4/oem-config-prepare-kde.desktop'):
+                    for desktop_file in (f'{apps_dir}/oem-config-prepare-gtk.desktop', f'{apps_dir}/kde4/oem-config-prepare-kde.desktop'):
                         if os.path.exists(self.target_file(desktop_file)):
                             desktop_base = os.path.basename(desktop_file)
                             install_misc.chrex(
@@ -1363,17 +1372,29 @@ class Install(install_misc.InstallBase):
                                 '-o', 'oem', '-g', 'oem',
                                 '/home/oem/Desktop')
                             install_misc.chrex(
-                                self.target, 'install',
-                                '-o', 'oem', '-g', 'oem',
-                                '/%s' % desktop_file,
-                                '/home/oem/Desktop/%s' % desktop_base)
+                                self.target,
+                                'install',
+                                '-o',
+                                'oem',
+                                '-g',
+                                'oem',
+                                f'/{desktop_file}',
+                                f'/home/oem/Desktop/{desktop_base}',
+                            )
                             install_misc.chrex(
                                 self.target,
-                                'sudo', '-i', '-u', 'oem',
-                                'dbus-run-session', '--',
-                                'gio', 'set',
-                                '/home/oem/Desktop/%s' % desktop_base,
-                                'metadata::trusted', 'true')
+                                'sudo',
+                                '-i',
+                                '-u',
+                                'oem',
+                                'dbus-run-session',
+                                '--',
+                                'gio',
+                                'set',
+                                f'/home/oem/Desktop/{desktop_base}',
+                                'metadata::trusted',
+                                'true',
+                            )
                             break
 
                     # Disable gnome-initial-setup for the OEM user
@@ -1386,17 +1407,13 @@ class Install(install_misc.InstallBase):
                         'sudo', '-i', '-u', 'oem',
                         'touch', '/home/oem/.config/gnome-initial-setup-done')
 
-                # Carry the locale setting over to the installed system.
-                # This mimics the behavior in 01oem-config-udeb.
-                di_locale = self.db.get('debian-installer/locale')
-                if di_locale:
+                if di_locale := self.db.get('debian-installer/locale'):
                     install_misc.set_debconf(
                         self.target, 'debian-installer/locale', di_locale,
                         self.db)
-                # in an automated install, this key needs to carry over
-                installable_lang = self.db.get(
-                    'ubiquity/only-show-installable-languages')
-                if installable_lang:
+                if installable_lang := self.db.get(
+                    'ubiquity/only-show-installable-languages'
+                ):
                     install_misc.set_debconf(
                         self.target,
                         'ubiquity/only-show-installable-languages',
@@ -1432,7 +1449,7 @@ class Install(install_misc.InstallBase):
         # comprehension here, but that causes:
         #   SyntaxError: can not delete variable 'cache' referenced in nested
         #   scope
-        remove = set([pkg for pkg in cache.keys() if cache[pkg].is_installed])
+        remove = {pkg for pkg in cache.keys() if cache[pkg].is_installed}
         # Keep packages we explicitly installed.
         keep |= install_misc.query_recorded_installed()
         remove -= install_misc.expand_dependencies_simple(cache, keep, remove)
@@ -1712,7 +1729,7 @@ class Install(install_misc.InstallBase):
             # just stop there
             return
 
-        casper_user_home = os.path.expanduser('~%s' % casper_user)
+        casper_user_home = os.path.expanduser(f'~{casper_user}')
         casper_user_wallpaper_cache_dir = os.path.join(casper_user_home,
                                                        '.cache', 'wallpaper')
         target_user = self.db.get('passwd/username')
@@ -1770,7 +1787,7 @@ class Install(install_misc.InstallBase):
         if os.path.isfile(media_info):
             try:
                 target_media_info = \
-                    self.target_file('var/log/installer/media-info')
+                        self.target_file('var/log/installer/media-info')
                 shutil.copy(media_info, target_media_info)
                 os.chmod(target_media_info,
                          stat.S_IRUSR | stat.S_IWUSR |
@@ -1779,16 +1796,15 @@ class Install(install_misc.InstallBase):
                 pass
 
         try:
-            status = open(self.target_file('var/lib/dpkg/status'), 'rb')
-            status_gz = gzip.open(os.path.join(target_dir,
-                                               'initial-status.gz'), 'w')
-            while True:
-                data = status.read(65536)
-                if not data:
-                    break
-                status_gz.write(data)
-            status_gz.close()
-            status.close()
+            with open(self.target_file('var/lib/dpkg/status'), 'rb') as status:
+                status_gz = gzip.open(os.path.join(target_dir,
+                                                   'initial-status.gz'), 'w')
+                while True:
+                    if data := status.read(65536):
+                        status_gz.write(data)
+                    else:
+                        break
+                status_gz.close()
         except IOError:
             pass
         try:
@@ -1821,8 +1837,7 @@ class Install(install_misc.InstallBase):
         poolbytes = 512
         try:
             with open("/proc/sys/kernel/random/poolsize") as poolsize:
-                poolbits = int(poolsize.readline())
-                if poolbits:
+                if poolbits := int(poolsize.readline()):
                     poolbytes = int((poolbits + 7) / 8)
         except IOError:
             pass

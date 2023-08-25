@@ -66,8 +66,9 @@ class Install(install_misc.InstallBase):
             self.target = '/'
             return
 
-        assert os.path.ismount(self.target), \
-            'Failed to mount the target: %s' % str(self.target)
+        assert os.path.ismount(
+            self.target
+        ), f'Failed to mount the target: {str(self.target)}'
 
         self.select_language_packs(save=True)
         self.select_ecryptfs()
@@ -85,7 +86,7 @@ class Install(install_misc.InstallBase):
                            self.target_file('etc/apt/trusted.gpg'))
         apt_pkg.config.set("Acquire::gpgv::Options::",
                            "--ignore-time-conflict")
-        apt_pkg.config.set("DPkg::Options::", "--root=%s" % self.target)
+        apt_pkg.config.set("DPkg::Options::", f"--root={self.target}")
         # We don't want apt-listchanges or dpkg-preconfigure, so just clear
         # out the list of pre-installation hooks.
         apt_pkg.config.clear("DPkg::Pre-Install-Pkgs")
@@ -141,8 +142,7 @@ class Install(install_misc.InstallBase):
                         error_template = 'hd_fault'
                     else:
                         error_template = 'cd_fault'
-                    error_template = ('ubiquity/install/copying_error/%s' %
-                                      error_template)
+                    error_template = f'ubiquity/install/copying_error/{error_template}'
                     self.db.subst(error_template, 'ERROR', str(e))
                     self.db.input('critical', error_template)
                     self.db.go()
@@ -185,11 +185,7 @@ class Install(install_misc.InstallBase):
         """Find the boot kernel on the CD, if possible."""
 
         release_bits = os.uname()[2].split('-')
-        if len(release_bits) >= 3:
-            subarch = release_bits[2]
-        else:
-            subarch = None
-
+        subarch = release_bits[2] if len(release_bits) >= 3 else None
         for prefix in ('vmlinux', 'vmlinuz'):
             for suffix in ('', '.efi', '.efi.signed'):
                 kernel = os.path.join(self.casper_path, prefix)
@@ -201,8 +197,7 @@ class Install(install_misc.InstallBase):
                     if os.path.exists(kernel + suffix):
                         return kernel
 
-                    kernel = os.path.join(self.casper_path,
-                                          '%s-%s' % (prefix, subarch))
+                    kernel = os.path.join(self.casper_path, f'{prefix}-{subarch}')
                     if os.path.exists(kernel + suffix):
                         return kernel
 
@@ -294,10 +289,10 @@ class Install(install_misc.InstallBase):
                     altmeta = self.db.get(
                         'base-installer/kernel/altmeta')
                     if altmeta:
-                        altmeta = '-%s' % altmeta
+                        altmeta = f'-{altmeta}'
                 except debconf.DebconfError:
                     altmeta = ''
-                keep.add('linux-signed-generic%s' % altmeta)
+                keep.add(f'linux-signed-generic{altmeta}')
             else:
                 keep.add('grub')
 
@@ -316,8 +311,10 @@ class Install(install_misc.InstallBase):
         # Consider only packages that don't have a prerm, and which can
         # therefore have their files removed without any preliminary work.
         difference = {
-            x for x in difference
-            if not os.path.exists('/var/lib/dpkg/info/%s.prerm' % x)}
+            x
+            for x in difference
+            if not os.path.exists(f'/var/lib/dpkg/info/{x}.prerm')
+        }
 
         confirmed_remove = set()
         with cache.actiongroup():
@@ -348,9 +345,7 @@ class Install(install_misc.InstallBase):
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             universal_newlines=True)
         res = subp.communicate()[0].splitlines()
-        u = {}
-        for x in res:
-            u[x] = 1
+        u = {x: 1 for x in res}
         self.blacklist = u
 
     def copy_all(self):
@@ -398,11 +393,7 @@ class Install(install_misc.InstallBase):
         long_enough = False
         time_last_update = time_start
         debug = 'UBIQUITY_DEBUG' in os.environ
-        if self.db.get('ubiquity/install/md5_check') == 'false':
-            md5_check = False
-        else:
-            md5_check = True
-
+        md5_check = self.db.get('ubiquity/install/md5_check') != 'false'
         # Increase kernel flush times during bulk data copying to make it
         # more likely that small files are packed contiguously, which should
         # speed up initial boot times.
@@ -434,11 +425,13 @@ class Install(install_misc.InstallBase):
                 st = os.lstat(sourcepath)
 
                 # Is the path blacklisted?
-                if (not stat.S_ISDIR(st.st_mode) and
-                        '/' in relpath and
-                        '/%s' % relpath in self.blacklist):
+                if (
+                    not stat.S_ISDIR(st.st_mode)
+                    and '/' in relpath
+                    and f'/{relpath}' in self.blacklist
+                ):
                     if debug:
-                        syslog.syslog('Not copying %s' % relpath)
+                        syslog.syslog(f'Not copying {relpath}')
                     continue
 
                 # Remove the target if necessary and if we can.
@@ -551,23 +544,23 @@ class Install(install_misc.InstallBase):
         # Try some possible locations for the kernel we used to boot. This
         # lets us save a couple of megabytes of CD space.
         bootdir = self.target_file('boot')
-        kernel = self.find_cd_kernel()
-        if kernel:
+        if kernel := self.find_cd_kernel():
             prefix = os.path.basename(kernel).split('-', 1)[0]
             release = os.uname()[2]
-            target_kernel = os.path.join(bootdir, '%s-%s' % (prefix, release))
+            target_kernel = os.path.join(bootdir, f'{prefix}-{release}')
             copies = []
 
             # ISO9660 images may have to use .efi rather than .efi.signed in
             # order to support being booted using isolinux, which must abide
             # by archaic 8.3 restrictions.
-            for suffix in (".efi", ".efi.signed"):
-                if os.path.exists(kernel + suffix):
-                    signed_kernel = kernel + suffix
-                    break
-            else:
-                signed_kernel = None
-
+            signed_kernel = next(
+                (
+                    kernel + suffix
+                    for suffix in (".efi", ".efi.signed")
+                    if os.path.exists(kernel + suffix)
+                ),
+                None,
+            )
             if os.path.exists(kernel):
                 copies.append((kernel, target_kernel))
             elif signed_kernel is not None:
@@ -575,7 +568,7 @@ class Install(install_misc.InstallBase):
                 copies.append((signed_kernel, target_kernel))
 
             if signed_kernel is not None:
-                copies.append((signed_kernel, "%s.efi.signed" % target_kernel))
+                copies.append((signed_kernel, f"{target_kernel}.efi.signed"))
 
             for source, target in copies:
                 osextras.unlink_force(target)
@@ -605,8 +598,7 @@ class Install(install_misc.InstallBase):
             blockdev_prefix = 'loop'
 
         if blockdev_prefix == '':
-            raise install_misc.InstallStepError(
-                "No source device found for %s" % fsfile)
+            raise install_misc.InstallStepError(f"No source device found for {fsfile}")
 
         dev = ''
         sysloops = sorted([x for x in os.listdir('/sys/block')
@@ -630,18 +622,17 @@ class Install(install_misc.InstallBase):
                     devbase = udevinfo.communicate()[0]
                     if udevinfo.returncode != 0:
                         devbase = sysloop
-                    dev = '/dev/%s' % devbase
+                    dev = f'/dev/{devbase}'
                     break
             except Exception:
                 continue
 
         if dev == '':
-            raise install_misc.InstallStepError(
-                "No loop device available for %s" % fsfile)
+            raise install_misc.InstallStepError(f"No loop device available for {fsfile}")
 
         misc.execute('losetup', dev, fsfile)
         if mountpoint is None:
-            mountpoint = '/var/lib/ubiquity/%s' % sysloop
+            mountpoint = f'/var/lib/ubiquity/{sysloop}'
         if not os.path.isdir(mountpoint):
             os.mkdir(mountpoint)
         if not misc.execute('mount', dev, mountpoint):
@@ -658,7 +649,7 @@ class Install(install_misc.InstallBase):
         self.mountpoints = []
 
         if not os.path.isdir(self.source):
-            syslog.syslog('mkdir %s' % self.source)
+            syslog.syslog(f'mkdir {self.source}')
             os.mkdir(self.source)
 
         fs_preseed = self.db.get('ubiquity/install/filesystem-images')
@@ -689,18 +680,17 @@ class Install(install_misc.InstallBase):
             # Just one preseeded image.
             if not os.path.isfile(fs_preseed):
                 raise install_misc.InstallStepError(
-                    "Preseeded filesystem image %s not found" % fs_preseed)
+                    f"Preseeded filesystem image {fs_preseed} not found"
+                )
 
-                dev, mountpoint = self.mount_one_image(fsfile, self.source)
-                self.devs.append(dev)
-                self.mountpoints.append(mountpoint)
         else:
             # OK, so we need to mount multiple images and unionfs them
             # together.
             for fsfile in fs_preseed.split():
                 if not os.path.isfile(fsfile):
                     raise install_misc.InstallStepError(
-                        "Preseeded filesystem image %s not found" % fsfile)
+                        f"Preseeded filesystem image {fsfile} not found"
+                    )
 
                 dev, mountpoint = self.mount_one_image(fsfile)
                 self.devs.append(dev)
@@ -709,10 +699,15 @@ class Install(install_misc.InstallBase):
             assert self.devs
             assert self.mountpoints
 
-            misc.execute('mount', '-t', 'unionfs', '-o',
-                         'dirs=' + ':'.join(['%s=ro' % x
-                                             for x in self.mountpoints]),
-                         'unionfs', self.source)
+            misc.execute(
+                'mount',
+                '-t',
+                'unionfs',
+                '-o',
+                ('dirs=' + ':'.join([f'{x}=ro' for x in self.mountpoints])),
+                'unionfs',
+                self.source,
+            )
             self.mountpoints.append(self.source)
 
     # TODO need to somehow get this to plugininstall
@@ -726,13 +721,11 @@ class Install(install_misc.InstallBase):
 
         for mountpoint in mountpoints:
             if not misc.execute('umount', mountpoint):
-                raise install_misc.InstallStepError(
-                    "Failed to unmount %s" % mountpoint)
+                raise install_misc.InstallStepError(f"Failed to unmount {mountpoint}")
         for dev in devs:
             if (dev != '' and dev != 'unused' and
                     not misc.execute('losetup', '-d', dev)):
-                raise install_misc.InstallStepError(
-                    "Failed to detach loopback device %s" % dev)
+                raise install_misc.InstallStepError(f"Failed to detach loopback device {dev}")
 
     def select_ecryptfs(self):
         """Is ecryptfs in use by an existing user? If so, keep it installed.
@@ -746,8 +739,7 @@ class Install(install_misc.InstallBase):
         if os.path.isdir(home):
             for homedir in os.listdir(home):
                 if os.path.isdir(os.path.join(home, homedir, '.ecryptfs')):
-                    syslog.syslog('ecryptfs already in use in %s' %
-                                  os.path.join(home, homedir))
+                    syslog.syslog(f'ecryptfs already in use in {os.path.join(home, homedir)}')
                     install_misc.record_installed(['ecryptfs-utils'])
                     break
 

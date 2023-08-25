@@ -22,7 +22,7 @@ def main():
             frontend = sys.argv[i]
         elif sys.argv[i] == '--autopilot':
             try:
-                os.environ['GTK_MODULES'] += os.pathsep + 'autopilot'
+                os.environ['GTK_MODULES'] += f'{os.pathsep}autopilot'
             except KeyError:
                 os.environ['GTK_MODULES'] = 'autopilot'
         newargv.append(sys.argv[i])
@@ -38,8 +38,7 @@ def main():
             ibus_path = os.path.expanduser("~/.config/ibus/bus")
             if os.path.exists(ibus_path):
                 # Guess the path to the ibus config file
-                ibus_filename = "%s-unix-0" % (
-                    os.getenv("XDG_SESSION_COOKIE").split("-")[0])
+                ibus_filename = f'{os.getenv("XDG_SESSION_COOKIE").split("-")[0]}-unix-0'
                 ibus_config = os.path.join(ibus_path, ibus_filename)
                 with open(ibus_config, "r") as fp:
                     for line in fp:
@@ -72,16 +71,15 @@ def main():
             from importlib import util
             frontend_names = ['gtk_ui', 'kde_ui']
             for f in frontend_names:
-                if util.find_spec('ubiquity.frontend.%s' % f) is not None:
+                if util.find_spec(f'ubiquity.frontend.{f}') is not None:
                     frontend = f
                     break
-            if frontend is None:
-                raise AttributeError('No frontend available; tried %s' %
-                                     ', '.join(frontend_names))
+        if frontend is None:
+            raise AttributeError(
+                f"No frontend available; tried {', '.join(frontend_names)}"
+            )
 
-        toexec = ['pkexec', sys.argv[0]]
-        toexec.extend(newargv)
-
+        toexec = ['pkexec', sys.argv[0], *newargv]
     if 'UBIQUITY_WRAPPER_DEBUG' in os.environ:
         print(toexec, file=sys.stderr)
     os.execvp(toexec[0], toexec)

@@ -12,9 +12,9 @@ IMG_DIR = "/usr/share/ubiquity/qt/images"
 
 #U+ , or +U+ ... to string
 def fromUnicodeString(raw):
-    if raw[0:2] == "U+":
+    if raw[:2] == "U+":
         return chr(int(raw[2:], 16))
-    elif raw[0:2] == "+U":
+    elif raw[:2] == "+U":
         return chr(int(raw[3:], 16))
 
     return ""
@@ -177,7 +177,7 @@ class Keyboard(QWidget):
             remaining_x[i] = x
             remaining_widths[i] = rw
 
-            if i != 1 and i != 2:
+            if i not in [1, 2]:
                 rect = QRectF(x, y, rw, kw)
                 p.drawRoundedRect(rect, rx, rx)
 
@@ -185,7 +185,7 @@ class Keyboard(QWidget):
             y = y + space + kw
 
         if ext_return:
-            rx = rx * 2
+            rx *= 2
             x1 = remaining_x[1]
             y1 = .5 + kw * 1 + space * 1
             w1 = remaining_widths[1]
@@ -234,12 +234,8 @@ class Keyboard(QWidget):
         if self.layout is None:
             return
 
-        variantParam = ""
-        if self.variant:
-            variantParam = "-variant %s" % self.variant
-
-        cmd = "ckbcomp -model pc106 -layout %s %s -compact" % (
-            self.layout, variantParam)
+        variantParam = f"-variant {self.variant}" if self.variant else ""
+        cmd = f"ckbcomp -model pc106 -layout {self.layout} {variantParam} -compact"
         # print(cmd)
 
         pipe = subprocess.Popen(

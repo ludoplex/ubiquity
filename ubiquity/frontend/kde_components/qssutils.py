@@ -30,9 +30,5 @@ UIDIR = "/usr/share/ubiquity/qt"
 def load(filename, ltr):
     with open(os.path.join(UIDIR, filename)) as style:
         tmpl = Template(style.read())
-    args = {}
-    if ltr:
-        args["direction"] = "_ltr"
-    else:
-        args["direction"] = "_rtl"
+    args = {"direction": "_ltr" if ltr else "_rtl"}
     return tmpl.substitute(args)

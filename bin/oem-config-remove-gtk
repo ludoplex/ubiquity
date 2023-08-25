@@ -76,13 +76,18 @@ def using_cryptsetup():
 
 
 def main():
-    purge = []
-    for pkg in ('ubiquity', 'ubiquity-casper',
-                'ubiquity-ubuntu-artwork', 'ubiquity-slideshow-ubuntu',
-                'oem-config-slideshow-ubuntu', 'ubiquity-frontend-gtk'):
-        if glob.glob('/var/lib/dpkg/info/%s.list' % pkg):
-            purge.append(pkg)
-
+    purge = [
+        pkg
+        for pkg in (
+            'ubiquity',
+            'ubiquity-casper',
+            'ubiquity-ubuntu-artwork',
+            'ubiquity-slideshow-ubuntu',
+            'oem-config-slideshow-ubuntu',
+            'ubiquity-frontend-gtk',
+        )
+        if glob.glob(f'/var/lib/dpkg/info/{pkg}.list')
+    ]
     if not using_cryptsetup():
         purge.append("cryptsetup")
 

@@ -71,15 +71,14 @@ class Wizard(BaseFrontend):
         self.previous_excepthook(exctype, excvalue, exctb)
 
     def debconf_communicator(self):
-        if 'DEBIAN_HAS_FRONTEND' in os.environ:
-            # We may only instantiate Debconf once, as it fiddles with
-            # sys.stdout. See LP #24727.
-            if self.db is None:
-                self.db = PersistentDebconfCommunicator()
-            return self.db
-        else:
+        if 'DEBIAN_HAS_FRONTEND' not in os.environ:
             # This needs to be instantiated afresh each time, as normal.
             return BaseFrontend.debconf_communicator(self)
+        # We may only instantiate Debconf once, as it fiddles with
+        # sys.stdout. See LP #24727.
+        if self.db is None:
+            self.db = PersistentDebconfCommunicator()
+        return self.db
 
     def stop_debconf(self):
         if 'DEBIAN_HAS_FRONTEND' not in os.environ:
@@ -110,8 +109,7 @@ class Wizard(BaseFrontend):
                 mod.ui_class = mod.module.PageDebconf
                 mod.controller = Controller(self)
                 mod.ui = mod.ui_class(mod.controller)
-                title = mod.ui.get('plugin_title')
-                if title:
+                if title := mod.ui.get('plugin_title'):
                     mod.title = title
                     self.pageslen += 1
                     self.pages.append(mod)
@@ -135,32 +133,28 @@ class Wizard(BaseFrontend):
             else:
                 self.pagesindex += 1
 
-        # TODO: handle errors
-        if self.pagesindex == self.pageslen:
-            for install_component in plugininstall, install:
-                dbfilter = install_component.Install(self, db=self.db)
-                ret = dbfilter.run_unfiltered()
-                if ret != 0:
-                    self.installing = False
-                    if ret == 3:
-                        # error already handled by Install
-                        sys.exit(ret)
-                    elif (os.WIFSIGNALED(ret) and
-                          os.WTERMSIG(ret) in (signal.SIGINT, signal.SIGKILL,
-                                               signal.SIGTERM)):
-                        sys.exit(ret)
-                    elif os.path.exists('/var/lib/ubiquity/install.trace'):
-                        with open('/var/lib/ubiquity/install.trace') as tbfile:
-                            realtb = tbfile.read()
-                        raise RuntimeError(
-                            "Install failed with exit code %s\n%s" %
-                            (ret, realtb))
-                    else:
-                        raise RuntimeError(
-                            "Install failed with exit code %s; see "
-                            "/var/log/syslog" % ret)
-
-            telemetry.get().done(self.db)
-            return 0
-        else:
+        if self.pagesindex != self.pageslen:
             return 10
+        for install_component in (plugininstall, install):
+            dbfilter = install_component.Install(self, db=self.db)
+            ret = dbfilter.run_unfiltered()
+            if ret != 0:
+                self.installing = False
+                if ret == 3:
+                    # error already handled by Install
+                    sys.exit(ret)
+                elif (os.WIFSIGNALED(ret) and
+                      os.WTERMSIG(ret) in (signal.SIGINT, signal.SIGKILL,
+                                           signal.SIGTERM)):
+                    sys.exit(ret)
+                elif os.path.exists('/var/lib/ubiquity/install.trace'):
+                    with open('/var/lib/ubiquity/install.trace') as tbfile:
+                        realtb = tbfile.read()
+                    raise RuntimeError(
+                        "Install failed with exit code %s\n%s" %
+                        (ret, realtb))
+                else:
+                    raise RuntimeError(f"Install failed with exit code {ret}; see /var/log/syslog")
+
+        telemetry.get().done(self.db)
+        return 0

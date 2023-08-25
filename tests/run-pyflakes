@@ -62,7 +62,7 @@ def main():
     # Read in the exclusions file
     exclusions = {}
     with open(os.path.join(cur_dir, "pyflakes.exclude"), "r") as fp:
-        for line in fp.readlines():
+        for line in fp:
             if not line.startswith("#"):
                 exclusions[line.rstrip()] = 1
 

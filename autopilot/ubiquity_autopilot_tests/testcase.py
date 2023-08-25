@@ -64,8 +64,7 @@ class UbiquityTestCase(AutopilotTestCase):
         logger.debug('Checking for fatal errors')
         error_list = self.fatal_errors
         if len(error_list) > 0:
-            num = 1
-            for error in error_list:
+            for num, error in enumerate(error_list, start=1):
                 output = """
 =======================================================================
 !!! FATAL ERROR !!! found during install......
@@ -75,7 +74,6 @@ _______________________________________________________________________
 """ % error
                 self.addDetail("FATAL ERROR {0}: ".format(num),
                                text_content(output))
-                num += 1
             raise FatalError("{0} fatal error found during install"
                              .format(len(error_list)))
         return
@@ -84,8 +82,7 @@ _______________________________________________________________________
         logger.debug('Checking for non fatal errors')
         error_list = self.non_fatal_errors
         if len(error_list) > 0:
-            num = 1
-            for error in error_list:
+            for num, error in enumerate(error_list, start=1):
                 output = """
 =======================================================================
 Non-Fatal Errors found during install......
@@ -95,7 +92,6 @@ _______________________________________________________________________
 """ % error
                 self.addDetail("Non-Fatal error {0}: ".format(num),
                                text_content(output))
-                num += 1
             raise NonFatalErrors("{0} non fatal errors found during install"
                                  .format(len(error_list)))
         return
@@ -130,10 +126,7 @@ _______________________________________________________________________
             self.non_fatal_errors.append(stck)
 
     def expectIsInstance(self, obj, klass, msg=None):
-        if isinstance(klass, tuple):
-            matcher = IsInstance(*klass)
-        else:
-            matcher = IsInstance(klass)
+        matcher = IsInstance(*klass) if isinstance(klass, tuple) else IsInstance(klass)
         try:
             self._expectThat(obj, matcher, msg)
         except MismatchError:
